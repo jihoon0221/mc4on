@@ -9,6 +9,7 @@ type DayRecordsContextValue = {
   records: DayRecord[];
   isLoading: boolean;
   addOrUpdateToday: (input: CreateTodayRecordInput) => Promise<DayRecord>;
+  updateToday: (input: Partial<CreateTodayRecordInput>) => Promise<DayRecord | null>;
   markLearnedToday: (birdState?: BirdState) => Promise<DayRecord | null>;
   markImmediateRiskShown: (dateKey: string) => Promise<DayRecord | null>;
   reload: () => Promise<void>;
@@ -105,6 +106,25 @@ export function DayRecordsProvider({ children }: { children: React.ReactNode }) 
     [records]
   );
 
+  const updateToday = useCallback(
+    async (input: Partial<CreateTodayRecordInput>) => {
+      const todayKey = getSeoulDateKey();
+      const now = new Date().toISOString();
+      const existing = records.find((record) => record.date === todayKey);
+      if (!existing) return null;
+      const nextRecord: DayRecord = {
+        ...existing,
+        ...input,
+        updatedAt: now,
+      };
+      const updated = records.map((record) => (record.date === todayKey ? nextRecord : record));
+      setRecords(updated);
+      await saveDayRecords(updated);
+      return nextRecord;
+    },
+    [records]
+  );
+
   const markLearnedToday = useCallback(async (birdState?: BirdState) => {
     const todayKey = getSeoulDateKey();
     const now = new Date().toISOString();
@@ -147,11 +167,12 @@ export function DayRecordsProvider({ children }: { children: React.ReactNode }) 
       records,
       isLoading,
       addOrUpdateToday,
+      updateToday,
       markLearnedToday,
       markImmediateRiskShown,
       reload,
     }),
-    [records, isLoading, addOrUpdateToday, markLearnedToday, markImmediateRiskShown, reload]
+    [records, isLoading, addOrUpdateToday, updateToday, markLearnedToday, markImmediateRiskShown, reload]
   );
 
   return <DayRecordsContext.Provider value={value}>{children}</DayRecordsContext.Provider>;

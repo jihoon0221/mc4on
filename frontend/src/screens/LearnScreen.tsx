@@ -67,7 +67,7 @@ export default function LearnScreen({ onCompleted, closeOnComplete = false, insi
     'Could you send just one more photo?',
   ];
 
-  const useDemo = !todayRecord || (todayRecord.nativeSentences?.length ?? 0) === 0;
+  const useDemo = !todayRecord || (todayRecord.extractedSentences?.length ?? 0) === 0;
   const sentences = (useDemo ? demoSentences : todayRecord?.extractedSentences ?? []).slice(0, 3);
   const nativeSentences = useDemo ? demoNativeSentences : todayRecord?.nativeSentences ?? [];
   const learned = todayRecord?.learned ?? false;

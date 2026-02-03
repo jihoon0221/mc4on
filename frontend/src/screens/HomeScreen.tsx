@@ -19,6 +19,7 @@ import Nest from '@/src/components/Nest';
 import TopBar from '@/src/components/TopBar';
 import { useDayRecords } from '@/src/context/day-records-context';
 import type { BirdState as ModelBirdState } from '@/src/models/bird-state';
+import { getDailyReport, pollAnalysisJob, uploadKakaoChat } from '@/src/api/scamApi';
 import { getSeoulDateKey } from '@/src/utils/date';
 import { parseKakaoFile, type ParsedConversation } from '@/src/utils/kakaoImport';
 
@@ -68,7 +69,7 @@ export default function HomeScreen() {
   const [mouthOpen, setMouthOpen] = useState(false);
   const [importMessage, setImportMessage] = useState('');
   const [importError, setImportError] = useState('');
-  const { addOrUpdateToday, records } = useDayRecords();
+  const { addOrUpdateToday, updateToday, records } = useDayRecords();
 
   const eggCrack = useRef(new Animated.Value(0)).current;
   const eggOverlayScale = useRef(new Animated.Value(0.9)).current;
@@ -331,6 +332,7 @@ export default function HomeScreen() {
       const updated = await addOrUpdateToday({
         extractedSentences: parsed.messages.slice(0, 3),
         nativeSentences: undefined,
+        analysisSummary: parsed.summary,
         flags: parsed.flags,
         sourceFileName: file.name,
       });
@@ -342,6 +344,39 @@ export default function HomeScreen() {
         feedScale.setValue(1);
         feedOpacity.setValue(1);
         setImportMessage('오늘의 먹이가 준비됐어요. 새에게 먹여볼까요?');
+      }
+
+      try {
+        setImportMessage('서버에서 분석을 시작했어요.');
+        const uploadResponse = await uploadKakaoChat({
+          file: {
+            uri: targetUri,
+            name: file.name,
+            type: file.mimeType ?? 'text/plain',
+          },
+        });
+        if (!uploadResponse.analysis_job_id) {
+          setImportMessage('새로운 대화가 없어 분석을 건너뛰었어요.');
+        } else {
+          const status = await pollAnalysisJob({ jobId: uploadResponse.analysis_job_id });
+          if (status.status === 'FAILED') {
+            setImportError(status.error_message ?? '분석에 실패했어요.');
+          } else if (uploadResponse.last_ingested_date) {
+            const report = await getDailyReport(uploadResponse.last_ingested_date);
+            const learningSentences = report.learning_contents.map((item) => item.content);
+            await updateToday({
+              extractedSentences: learningSentences.length > 0 ? learningSentences : parsed.messages.slice(0, 3),
+              analysisSummary: report.summary_text ?? parsed.summary,
+              analysisWarning: report.warning_text ?? undefined,
+            });
+            setImportMessage('분석이 완료됐어요. 오늘의 학습을 확인해 보세요.');
+          } else {
+            setImportMessage('분석이 완료됐어요. 결과를 불러올 수 없어요.');
+          }
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : '분석 중 오류가 발생했어요.';
+        setImportError(message);
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : '';
@@ -736,6 +771,5 @@ const styles = StyleSheet.create({
     width: 78,
   },
 });
-
 
 

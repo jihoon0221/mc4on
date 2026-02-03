@@ -18,6 +18,8 @@ export default function LearnNotepadModal() {
     if (!todayRecord) return [];
     const flags = todayRecord.flags;
     const lines: string[] = [];
+    if (todayRecord.analysisWarning) lines.push(todayRecord.analysisWarning);
+    if (todayRecord.analysisSummary) lines.push(todayRecord.analysisSummary);
     if (flags.moneyRequest) lines.push('금전 관련 표현이 있었어요.');
     if (flags.favorRequest) lines.push('부탁/도움 요청이 있었어요.');
     if (flags.excessivePraise) lines.push('과한 칭찬 표현이 있었어요.');

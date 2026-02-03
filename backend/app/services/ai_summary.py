@@ -84,6 +84,65 @@ def generate_summary(message_texts: list[str]) -> str | None:
     return summary
 
 
+def generate_short_summary(
+    message_texts: list[str],
+    full_summary: str | None = None,
+) -> str | None:
+    if settings.groq_api_key and settings.groq_model_summary:
+        normalized = _normalize_messages(message_texts)
+        if not normalized:
+            return None
+        prompt = _build_short_prompt(normalized, full_summary)
+        response = _groq_client.generate_json(settings.groq_model_summary, prompt)
+        if response and response.get("short_summary"):
+            return _normalize_short_summary(response.get("short_summary"))
+    if settings.gemini_api_key and settings.gemini_model_summary:
+        normalized = _normalize_messages(message_texts)
+        if not normalized:
+            return None
+        prompt = _build_short_prompt(normalized, full_summary)
+        response = _gemini_client.generate_json(settings.gemini_model_summary, prompt)
+        if response and response.get("short_summary"):
+            return _normalize_short_summary(response.get("short_summary"))
+    if settings.hf_api_key and settings.hf_model_summary:
+        normalized = _normalize_messages(message_texts)
+        if not normalized:
+            return None
+        prompt = _build_short_prompt(normalized, full_summary)
+        response = _hf_client.generate_json(settings.hf_model_summary, prompt)
+        if response and response.get("short_summary"):
+            return _normalize_short_summary(response.get("short_summary"))
+    if not settings.openai_model_summary:
+        return None
+    normalized = _normalize_messages(message_texts)
+    if not normalized:
+        return None
+    cache_key = "short|" + "|".join(normalized) + "|" + (full_summary or "")
+    cached = _cache.get(cache_key)
+    if cached:
+        return cached
+    prompt = _build_short_prompt(normalized, full_summary)
+    schema = {
+        "name": "short_summary_schema",
+        "schema": {
+            "type": "object",
+            "properties": {"short_summary": {"type": ["string", "null"]}},
+            "required": ["short_summary"],
+            "additionalProperties": False,
+        },
+        "strict": True,
+    }
+    response = _client.structured_response(settings.openai_model_summary, prompt, schema)
+    if not response:
+        response = _client.structured_response(settings.openai_model_summary, prompt, schema)
+    if not response:
+        return None
+    short_summary = _normalize_short_summary(response.get("short_summary"))
+    if short_summary:
+        _cache.set(cache_key, short_summary)
+    return short_summary
+
+
 def _normalize_messages(message_texts: list[str]) -> list[str]:
     seen = set()
     output = []
@@ -109,3 +168,44 @@ def _build_prompt(messages: list[str]) -> str:
         "결과는 JSON으로 summary 필드만 반환하세요.\n\n"
         f"{joined}"
     )
+
+
+def _build_short_prompt(messages: list[str], full_summary: str | None) -> str:
+    joined = "\n".join(f"- {m}" for m in messages)
+    summary_hint = f"\n\n[기존 요약]\n{full_summary}" if full_summary else ""
+    return (
+        "다음 대화를 한 문장으로 부드럽게 요약하세요.\n"
+        "사실 기반으로 요약하되, 위험/경고 단어는 사용하지 마세요.\n"
+        "확정적 단정은 피하고, 문장 끝은 반드시 부드러운 종결형으로 마무리하세요. 예: \"~했어요\", \"~했네요\", \"~처럼 보였어요\".\n"
+        "결과는 JSON으로 short_summary 필드만 반환하세요.\n\n"
+        f"{joined}"
+        f"{summary_hint}"
+    )
+
+
+def _normalize_short_summary(value: object) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    text = " ".join(text.split())
+    text = _first_sentence(text)
+    return _ensure_soft_ending(text)
+
+
+def _first_sentence(text: str) -> str:
+    for idx, ch in enumerate(text):
+        if ch in ".!?":
+            return text[: idx + 1].strip()
+    return text.strip()
+
+
+def _ensure_soft_ending(text: str) -> str:
+    if not text:
+        return text
+    if text.endswith(("요.", "네요.", "입니다.", "해요.", "했어요.", "보였어요.", "했네요.")):
+        return text
+    if text.endswith((".", "!", "?")):
+        return text[:-1] + "어요."
+    return text + "어요."

@@ -13,7 +13,7 @@ from app.models.models import (
     LearningContentTypeEnum,
 )
 from app.services.ai_digest import generate_daily_digest
-from app.services.ai_summary import generate_summary
+from app.services.ai_summary import generate_short_summary, generate_summary
 from app.services.risk import RiskAssessment, assess_risk
 
 
@@ -126,6 +126,9 @@ def _build_summary_short(
     summary_text: str,
     message_texts: list[str],
 ) -> str | None:
+    ai_short = generate_short_summary(message_texts, summary_text)
+    if ai_short:
+        return ai_short
     if summary_text:
         sentence = _one_sentence_summary(summary_text)
         if sentence:

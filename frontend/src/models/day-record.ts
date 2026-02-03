@@ -21,6 +21,8 @@ export type DayRecord = {
   sourceFileName?: string;
   extractedSentences: string[];
   nativeSentences?: string[];
+  analysisSummary?: string;
+  analysisWarning?: string;
   flags: DayFlags;
   uploadCount: number;
   learned: boolean;
@@ -37,4 +39,6 @@ export type CreateTodayRecordInput = {
   immediateRisk?: ImmediateRisk;
   nativeSentences?: string[];
   sourceFileName?: string;
+  analysisSummary?: string;
+  analysisWarning?: string;
 };
