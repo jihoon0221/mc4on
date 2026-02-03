@@ -1,0 +1,13 @@
+[Unit]
+Description=Scam Retention Cleanup Worker
+After=network.target
+
+[Service]
+WorkingDirectory=/home/ubuntu/apps/scam-api
+EnvironmentFile=/home/ubuntu/apps/scam-api/.env
+ExecStart=/home/ubuntu/apps/scam-api/.venv/bin/python scripts/run_retention_worker.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,13 @@
+[Unit]
+Description=Scam Analysis Worker
+After=network.target
+
+[Service]
+WorkingDirectory=/home/ubuntu/apps/scam-api
+EnvironmentFile=/home/ubuntu/apps/scam-api/.env
+ExecStart=/home/ubuntu/apps/scam-api/.venv/bin/python scripts/run_analysis_worker.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

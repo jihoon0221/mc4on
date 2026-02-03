@@ -1,0 +1,13 @@
+[Unit]
+Description=Scam API (FastAPI)
+After=network.target
+
+[Service]
+WorkingDirectory=/home/ubuntu/apps/scam-api
+EnvironmentFile=/home/ubuntu/apps/scam-api/.env
+ExecStart=/home/ubuntu/apps/scam-api/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

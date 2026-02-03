@@ -1,0 +1,59 @@
+services:
+  db:
+    image: postgres:16
+    container_name: scam-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: scam
+      POSTGRES_PASSWORD: scam
+      POSTGRES_DB: scam
+    ports:
+      - "5432:5432"
+    volumes:
+      - scam-postgres-data:/var/lib/postgresql/data
+  api:
+    build: .
+    container_name: scam-api
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://scam:scam@db:5432/scam
+      DATA_DIR: /data
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/data
+    depends_on:
+      - db
+  worker:
+    build: .
+    container_name: scam-worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://scam:scam@db:5432/scam
+      DATA_DIR: /data
+    command: ["python", "scripts/run_analysis_worker.py"]
+    volumes:
+      - ./data:/data
+    depends_on:
+      - db
+  retention:
+    build: .
+    container_name: scam-retention
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://scam:scam@db:5432/scam
+      DATA_DIR: /data
+    command: ["python", "scripts/run_retention_worker.py"]
+    volumes:
+      - ./data:/data
+    depends_on:
+      - db
+
+volumes:
+  scam-postgres-data:
