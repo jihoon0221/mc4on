@@ -1,4 +1,5 @@
-﻿import { useRouter } from 'expo-router';
+﻿import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import { FlatList, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 
@@ -6,8 +7,9 @@ import FilterChips, { type FilterKey } from '@/src/components/FilterChips';
 import TopBar from '@/src/components/TopBar';
 import JourneyHeader from '@/src/components/JourneyHeader';
 import TimelineCard, { type TimelineCardItem } from '@/src/components/TimelineCard';
+import SettingsMenu from '@/src/components/SettingsMenu';
+import SignalWarningSheet from '@/src/components/SignalWarningSheet';
 import { useDayRecords } from '@/src/context/day-records-context';
-import { useTimeline } from '@/src/context/timeline-context';
 import type { BirdState as ModelBirdState } from '@/src/models/bird-state';
 import type { BirdState as VisualBirdState } from '@/src/components/BirdCharacter';
 import { getSeoulDateKey } from '@/src/utils/date';
@@ -119,18 +121,6 @@ function buildTitleSubtitle(flags: ReturnType<typeof useDayRecords>['records'][0
   };
 }
 
-function normalizeTags(tags: string[]) {
-  if (tags.length === 0) return ['#일상대화'];
-  return tags.map((tag) => (tag.startsWith('#') ? tag : `#${tag}`));
-}
-
-function buildSummarySubtitle(tags: string[]) {
-  if (tags.length === 0) {
-    return '오늘의 기록을 정리했어요.';
-  }
-  return tags.slice(0, 3).join(' · ');
-}
-
 function deriveStage(tags: string[], totalCount: number) {
   if (tags.some((tag) => STAGE_TAGS.stage3.includes(tag))) return 3;
   if (tags.some((tag) => STAGE_TAGS.stage2.includes(tag))) return 2;
@@ -153,10 +143,11 @@ const WARNING_MESSAGE = '이 기록은 잠시 멈춰 다시 살펴볼 만한 부
 export default function TimelineScreen() {
   const router = useRouter();
   const { records, markImmediateRiskShown } = useDayRecords();
-  const { entries: timelineEntries } = useTimeline();
   const [filter, setFilter] = useState<FilterKey>('all');
   const [riskTargetId, setRiskTargetId] = useState<string | null>(null);
   const [warningTarget, setWarningTarget] = useState<TimelineCardItem | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [warningOpen, setWarningOpen] = useState(false);
   const todayKey = useMemo(() => getSeoulDateKey(), []);
 
   const sortedRecords = useMemo(
@@ -165,24 +156,6 @@ export default function TimelineScreen() {
   );
 
   const items = useMemo(() => {
-    if (timelineEntries.length > 0) {
-      return timelineEntries.map((entry, index) => {
-        const tags = normalizeTags(entry.tags);
-        const isToday = entry.date === todayKey;
-        const groupLabel = isToday ? '오늘' : `Day ${index + 1}`;
-
-        return {
-          id: entry.id,
-          groupLabel,
-          dateLabel: formatMonthDay(entry.date),
-          title: entry.summary,
-          subtitle: buildSummarySubtitle(tags),
-          tags,
-          status: 'learned',
-          birdState: mapBirdState(entry.birdState),
-        } satisfies TimelineCardItem;
-      });
-    }
     if (sortedRecords.length === 0) return MOCK_ITEMS;
     return sortedRecords.map((record, index) => {
       const tags = buildTagsFromFlags(record.flags);
@@ -202,7 +175,7 @@ export default function TimelineScreen() {
         __flags: record.flags,
       } as TimelineCardItem & { __flags: typeof record.flags };
     });
-  }, [sortedRecords, todayKey, timelineEntries]);
+  }, [sortedRecords, todayKey]);
 
   const filtered = useMemo(() => {
     if (filter === 'all') return items;
@@ -218,6 +191,23 @@ export default function TimelineScreen() {
   }, [items]);
 
   const stageIndex = useMemo(() => deriveStage(recentTags, items.length), [recentTags, items.length]);
+
+  const last7Count = useMemo(() => {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 7);
+    return sortedRecords.filter((record) => {
+      const date = new Date(record.date + 'T00:00:00');
+      const hasSignal = Object.values(record.flags).some(Boolean);
+      return hasSignal && date >= cutoff;
+    }).length;
+  }, [sortedRecords]);
+
+  const highSignalToday = useMemo(() => {
+    const today = sortedRecords[0];
+    if (!today) return false;
+    const count = Object.values(today.flags).filter(Boolean).length;
+    return today.flags.moneyRequest || count >= 2;
+  }, [sortedRecords]);
 
   useEffect(() => {
     const candidate = records.find(
@@ -272,9 +262,21 @@ export default function TimelineScreen() {
         contentContainerStyle={styles.listContent}
         ListHeaderComponent={
           <View style={styles.headerWrap}>
-            <TopBar title="타임라인" />
+            <TopBar onPressSettings={() => setSettingsOpen(true)} />
 
             <JourneyHeader activeIndex={stageIndex} birdState="healthy" onRewindPress={() => { /* TODO: rewind modal */ }} />
+
+            <Pressable style={styles.warningButton} onPress={() => setWarningOpen(true)} accessibilityRole="button">
+              <View style={styles.warningButtonLeft}>
+                <Ionicons name="alert-circle" size={16} color="#6c5f56" />
+                <Text style={styles.warningButtonText}>주의 흐름 살펴보기</Text>
+              </View>
+              <View style={styles.warningBadge}>
+                <Text style={styles.warningBadgeText}>
+                  {highSignalToday ? '오늘 강한 신호' : `최근 7일 ${last7Count}개 신호`}
+                </Text>
+              </View>
+            </Pressable>
 
             <FilterChips selected={filter} onSelect={setFilter} />
           </View>
@@ -330,6 +332,10 @@ export default function TimelineScreen() {
           </View>
         </View>
       ) : null}
+
+      <SettingsMenu visible={settingsOpen} onClose={() => setSettingsOpen(false)} />
+
+      <SignalWarningSheet visible={warningOpen} records={sortedRecords} onClose={() => setWarningOpen(false)} />
     </SafeAreaView>
   );
 }
@@ -355,6 +361,35 @@ const styles = StyleSheet.create({
   headerWrap: {
     gap: 16,
     paddingBottom: 8,
+  },
+  warningButton: {
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.72)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  warningButtonLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  warningButtonText: {
+    fontSize: 13,
+    color: '#5d4e45',
+    fontWeight: '600',
+  },
+  warningBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+    backgroundColor: 'rgba(215, 191, 176, 0.5)',
+  },
+  warningBadgeText: {
+    fontSize: 11,
+    color: '#6d5f55',
   },
   headerTop: {
     flexDirection: 'row',
@@ -442,3 +477,6 @@ const styles = StyleSheet.create({
     color: '#7b6c62',
   },
 });
+
+
+

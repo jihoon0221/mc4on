@@ -5,8 +5,6 @@ export type TimelineEntry = {
   date: string; // YYYY-MM-DD
   summary: string;
   tags: string[];
-  warningText?: string | null;
-  warningTags?: string[];
   birdState: BirdState;
   createdAt: string;
   sourceFileName?: string;

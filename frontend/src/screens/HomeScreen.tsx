@@ -16,12 +16,10 @@ import {
 
 import BirdCharacter, { type BirdState } from '@/src/components/BirdCharacter';
 import Nest from '@/src/components/Nest';
+import SettingsMenu from '@/src/components/SettingsMenu';
 import TopBar from '@/src/components/TopBar';
 import { useDayRecords } from '@/src/context/day-records-context';
-import { useTimeline } from '@/src/context/timeline-context';
-import { savePendingBatchDates } from '@/src/storage/batch-memo-storage';
 import type { BirdState as ModelBirdState } from '@/src/models/bird-state';
-import { uploadKakao } from '@/src/api/upload';
 import { getSeoulDateKey } from '@/src/utils/date';
 import { parseKakaoFile, type ParsedConversation } from '@/src/utils/kakaoImport';
 
@@ -71,8 +69,8 @@ export default function HomeScreen() {
   const [mouthOpen, setMouthOpen] = useState(false);
   const [importMessage, setImportMessage] = useState('');
   const [importError, setImportError] = useState('');
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const { addOrUpdateToday, records } = useDayRecords();
-  const { reload: reloadTimeline } = useTimeline();
 
   const eggCrack = useRef(new Animated.Value(0)).current;
   const eggOverlayScale = useRef(new Animated.Value(0.9)).current;
@@ -108,6 +106,7 @@ export default function HomeScreen() {
   const learnedToday = todayRecord?.learned ?? false;
   const mappedState = mapBirdStateToVisual(todayRecord?.birdState);
   const visualState = learnedToday ? cycleStates[cycleIndex] : 'healthy';
+  const eggAvailable = eggReady || hasTodayEgg;
 
   useEffect(() => {
     if (!eggJustLaid) return;
@@ -151,7 +150,7 @@ export default function HomeScreen() {
   }, [todayRecord?.learned, todayRecord?.updatedAt, cycleStates.length]);
 
   const openNotepad = () => {
-    if (!eggReady || eggCracking) return;
+    if (!eggAvailable || eggCracking) return;
     setEggCracking(true);
     setShowEggOverlay(true);
     eggOverlayScale.setValue(0.9);
@@ -221,7 +220,7 @@ export default function HomeScreen() {
       setEggJustLaid(true);
       setMouthOpen(false);
       mouthOpenRef.current = false;
-      setEggNotice('?뚯씠 ?앷꼈?댁슂!');
+      setEggNotice('알이 생겼어요!');
       setTimeout(() => setEggNotice(''), 1600);
     });
   };
@@ -306,18 +305,15 @@ export default function HomeScreen() {
     let pickedIsZip = false;
 
     try {
-      console.log('KAKAO_PICK_START');
       const result = await DocumentPicker.getDocumentAsync({
         type: ['application/zip', 'text/plain'],
         copyToCacheDirectory: true,
       });
       if (result.canceled) {
-        console.log('KAKAO_PICK_CANCEL');
         setIsImporting(false);
         return;
       }
       const file = result.assets[0];
-      console.log('KAKAO_PICK_FILE', { name: file.name, size: file.size, uri: file.uri, mime: file.mimeType });
       pickedIsZip = file.name.toLowerCase().endsWith('.zip');
       const dir = `${FileSystem.documentDirectory}imports/`;
       await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
@@ -334,7 +330,6 @@ export default function HomeScreen() {
       setImportedFile(meta);
 
       const parsed = await parseKakaoFile(targetUri, file.name);
-      console.log('KAKAO_PARSED', { count: parsed.messages.length });
       setParsedConversation(parsed);
       const updated = await addOrUpdateToday({
         extractedSentences: parsed.messages.slice(0, 3),
@@ -342,47 +337,6 @@ export default function HomeScreen() {
         flags: parsed.flags,
         sourceFileName: file.name,
       });
-      try {
-        console.log('KAKAO_UPLOAD_START');
-        const response = await uploadKakao({
-          file: {
-            uri: targetUri,
-            name: file.name,
-            mimeType: file.mimeType ?? undefined,
-          },
-          force: true,
-        });
-        console.log('KAKAO_UPLOAD_RESPONSE', response);
-        const result = response.analysis_result;
-        if (result) {
-          await addOrUpdateToday({
-            extractedSentences: parsed.messages.slice(0, 3),
-            nativeSentences: undefined,
-            flags: parsed.flags,
-            sourceFileName: file.name,
-            summaryText: result.summary_text ?? undefined,
-            summaryShort: result.summary_short ?? undefined,
-            summaryTags: result.tags ?? undefined,
-            warningText: result.warning_text ?? undefined,
-            warningTags: result.warning_tags ?? undefined,
-            learningItems: result.learning_items?.map((item) => ({
-              content: item.content,
-              contentType: item.content_type,
-              reviewDueDate: item.review_due_date,
-            })),
-          });
-          setImportMessage('오늘의 기록이 정리됐어요. 새에게 먹이를 줘볼까요?');
-        } else if (response.analysis_jobs && response.analysis_jobs.length > 0) {
-          const dates = response.analysis_jobs.map((job) => job.analysis_date);
-          await savePendingBatchDates(dates);
-          setImportMessage('여러 날의 기록을 분석 중이에요. 알을 눌러 메모를 확인해 주세요.');
-        }
-        await reloadTimeline();
-      } catch (uploadError) {
-        const message = uploadError instanceof Error ? uploadError.message : '';
-        console.log('KAKAO_UPLOAD_ERROR', message);
-        setImportError(message || '백엔드 업로드에 실패했어요. 네트워크를 확인해 주세요.');
-      }
       if (updated) {
         setFeedReady(true);
         setFeedVisible(true);
@@ -422,20 +376,20 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
         scrollEnabled={!(feedReady && !feedConsumed)}>
         <View style={styles.roomLayer}>
-          <TopBar style={styles.topBarAdjust} />
+          <TopBar style={styles.topBarAdjust} onPressSettings={() => setSettingsOpen(true)} />
 
           <Pressable
             style={styles.heroArea}
             ref={heroRef}
             onLayout={onHeroLayout}
             pointerEvents="box-none"
-            onPress={eggReady ? openNotepad : undefined}
+            onPress={eggAvailable ? openNotepad : undefined}
             accessibilityRole="button">
             <View style={[styles.sceneWrap, eggJustLaid && styles.sceneWrapPulse]}>
               <View style={styles.nestWrap}>
                 <Nest
                   state={visualState}
-                  showEgg={eggReady}
+                  showEgg={eggAvailable}
                   eggJustLaid={eggJustLaid}
                   onEggPress={openNotepad}
                 />
@@ -491,7 +445,7 @@ export default function HomeScreen() {
 
             <View style={styles.eggRow}>
               <Text style={styles.eggLabel}>
-                {eggReady
+                {eggAvailable
                   ? '오늘의 둥지에 작은 알이 놓였어요.'
                   : '조용히, 무엇이 달라지고 있는지 살펴보세요.'}
               </Text>
@@ -552,6 +506,7 @@ export default function HomeScreen() {
         </View>
       ) : null}
 
+      <SettingsMenu visible={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </SafeAreaView>
   );
 }
@@ -582,6 +537,7 @@ const styles = StyleSheet.create({
   },
   topBarAdjust: {
     marginHorizontal: -14,
+    marginTop: -14,
   },
   iconButton: {
     width: 34,
@@ -786,3 +742,6 @@ const styles = StyleSheet.create({
     width: 78,
   },
 });
+
+
+
