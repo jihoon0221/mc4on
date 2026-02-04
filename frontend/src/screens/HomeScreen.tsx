@@ -14,6 +14,7 @@ import {
   View,
 } from 'react-native';
 
+import { API_BASE_URL, apiFetch } from '@/src/api/client';
 import { uploadKakao, type KakaoUploadResponse } from '@/src/api/upload';
 import BirdCharacter, { type BirdState } from '@/src/components/BirdCharacter';
 import Nest from '@/src/components/Nest';
@@ -27,12 +28,35 @@ import { parseKakaoFile, type ParsedConversation } from '@/src/utils/kakaoImport
 
 const FEEDING_MS = 900;
 const FEED_CARD_SIZE = { width: 160, height: 64 };
+const ENABLE_UPLOAD_LOGS = typeof __DEV__ !== 'undefined' ? __DEV__ : true;
 
 type ImportedFile = {
   uri: string;
   name: string;
   size: number;
   mimeType?: string;
+};
+
+type AnalysisJobStatus = {
+  job_id: string;
+  status: string;
+  error_message: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type ReportHistoryItem = {
+  analysis_date: string;
+  summary_text: string | null;
+  tags: string[];
+  warning_text: string | null;
+  warning_tags: string[];
+  risk_level: number | null;
+  learning_items: Array<{ content_kr: string; content_fl: string }>;
+};
+
+type ReportHistoryResponse = {
+  items: ReportHistoryItem[];
 };
 
 function getBirdState(uploadCount: number): BirdState {
@@ -50,6 +74,16 @@ function mapBirdStateToVisual(state?: ModelBirdState): BirdState | null {
   if (state === 'relieved') return 'healthy';
   if (state === 'growing') return 'healthy';
   return null;
+}
+
+function logUpload(label: string, data: Record<string, unknown>) {
+  if (!ENABLE_UPLOAD_LOGS) return;
+  // eslint-disable-next-line no-console
+  console.log(`[upload] ${label}`, data);
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function normalizeAnalysisResult(input: KakaoUploadResponse['analysis_result']): AnalysisResult | undefined {
@@ -77,6 +111,23 @@ function normalizeAnalysisResult(input: KakaoUploadResponse['analysis_result']):
         review_due_date: item.review_due_date ?? null,
       };
     }),
+  };
+}
+
+function normalizeHistoryItem(item: ReportHistoryItem): AnalysisResult {
+  return {
+    analysis_date: item.analysis_date,
+    summary_text: item.summary_text ?? null,
+    tags: item.tags ?? [],
+    warning_text: item.warning_text ?? null,
+    warning_tags: item.warning_tags ?? [],
+    risk_level: item.risk_level ?? null,
+    learning_items: (item.learning_items ?? []).map((learn) => ({
+      content_kr: learn.content_kr,
+      content_fl: learn.content_fl,
+      content_type: 'sentence',
+      review_due_date: null,
+    })),
   };
 }
 
@@ -345,6 +396,12 @@ export default function HomeScreen() {
       }
       const file = result.assets[0];
       pickedIsZip = file.name.toLowerCase().endsWith('.zip');
+      logUpload('selected_file', {
+        name: file.name,
+        size: file.size ?? null,
+        mimeType: file.mimeType ?? null,
+        isZip: pickedIsZip,
+      });
       const dir = `${FileSystem.documentDirectory}imports/`;
       await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
       const safeName = `${Date.now()}_${file.name}`;
@@ -361,9 +418,23 @@ export default function HomeScreen() {
 
       const parsed = await parseKakaoFile(targetUri, file.name);
       setParsedConversation(parsed);
+      logUpload('parsed_conversation', {
+        messagesCount: parsed.messagesCount,
+        rawTextLength: parsed.rawTextLength,
+        tags: parsed.tags,
+        flags: parsed.flags,
+        summaryPreview: parsed.summary.slice(0, 120),
+      });
 
       let analysisResult: AnalysisResult | undefined;
       try {
+        logUpload('send_to_server', {
+          baseUrl: API_BASE_URL,
+          fileName: file.name,
+          fileSize: file.size ?? null,
+          mimeType: file.mimeType ?? null,
+          syncAnalysis: true,
+        });
         const response = await uploadKakao({
           file: {
             uri: targetUri,
@@ -371,10 +442,85 @@ export default function HomeScreen() {
             mimeType: file.mimeType ?? undefined,
           },
           syncAnalysis: true,
+          force: true,
+        });
+        const rawItems = response.analysis_result?.learning_items ?? [];
+        const jobId = response.analysis_job_id ?? null;
+        const jobDate = response.analysis_jobs?.[0]?.analysis_date ?? null;
+        const itemSchema = rawItems.length
+          ? 'content_kr' in rawItems[0]
+            ? 'new'
+            : 'old'
+          : 'none';
+        logUpload('server_response', {
+          analysisStatus: response.analysis_status ?? null,
+          analysisJobId: jobId,
+          analysisJobDate: jobDate,
+          hasAnalysisResult: Boolean(response.analysis_result),
+          analysisDate: response.analysis_result?.analysis_date ?? null,
+          itemSchema,
+          learningItemsCount: rawItems.length,
+          summaryTextPreview: response.analysis_result?.summary_text?.slice(0, 120) ?? null,
+          warningTextPreview: response.analysis_result?.warning_text?.slice(0, 120) ?? null,
         });
         analysisResult = normalizeAnalysisResult(response.analysis_result);
+
+        if (!analysisResult && jobId) {
+          void (async () => {
+            for (let attempt = 1; attempt <= 6; attempt += 1) {
+              await sleep(2000);
+              try {
+                const status = await apiFetch<AnalysisJobStatus>(`/analysis-jobs/${jobId}`);
+                logUpload('job_status', {
+                  attempt,
+                  jobId,
+                  status: status.status,
+                  error: status.error_message ?? null,
+                  updatedAt: status.updated_at,
+                });
+                if (status.status === 'FAILED') {
+                  setImportError(status.error_message ?? '분석 작업이 실패했어요.');
+                  break;
+                }
+                if (status.status === 'DONE') {
+                  const history = await apiFetch<ReportHistoryResponse>('/reports/history?limit=5');
+                  const target = jobDate
+                    ? history.items.find((item) => item.analysis_date === jobDate)
+                    : history.items[0];
+                  if (target) {
+                    const normalized = normalizeHistoryItem(target);
+                    await addOrUpdateToday({
+                      extractedSentences: parsed.messages.slice(0, 3),
+                      nativeSentences: undefined,
+                      flags: parsed.flags,
+                      sourceFileName: file.name,
+                      analysisResult: normalized,
+                    });
+                    logUpload('analysis_loaded', {
+                      analysisDate: normalized.analysis_date,
+                      learningItemsCount: normalized.learning_items.length,
+                    });
+                  } else {
+                    logUpload('analysis_not_found', { jobDate, items: history.items.length });
+                  }
+                  break;
+                }
+              } catch (error) {
+                logUpload('job_status_error', {
+                  attempt,
+                  jobId,
+                  message: error instanceof Error ? error.message : String(error),
+                });
+              }
+            }
+          })();
+        }
       } catch (error) {
         const message = error instanceof Error ? error.message : '';
+        logUpload('server_error', {
+          baseUrl: API_BASE_URL,
+          message: message || 'unknown error',
+        });
         setImportError(message ? `분석 서버 연결에 실패했어요: ${message}` : '분석 서버 연결에 실패했어요.');
       }
 

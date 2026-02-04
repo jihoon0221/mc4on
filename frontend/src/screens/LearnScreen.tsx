@@ -63,6 +63,10 @@ export default function LearnScreen({
     [records, todayKey]
   );
   const analysis = (analysisResult ?? todayRecord?.analysisResult ?? null) as AnalysisResult | null;
+  const showDebug = typeof __DEV__ !== 'undefined' && __DEV__;
+  const analysisDebug = analysis
+    ? `analysis: date=${analysis.analysis_date} summary=${analysis.summary_text ? 'y' : 'n'} items=${analysis.learning_items.length}`
+    : 'analysis: none';
 
   const demoSentences = [
     '오늘은 조금 천천히 이야기하고 싶어.',
@@ -165,6 +169,7 @@ export default function LearnScreen({
             {analysis?.analysis_date ? formatDateLabel(analysis.analysis_date) : useDemo ? '오늘' : formatDateLabel(todayKey)}
           </Text>
           <Text style={styles.helper}>상대의 말, 상대의 언어로 다시 말해봐요.</Text>
+          {showDebug ? <Text style={styles.debugText}>{analysisDebug}</Text> : null}
         </View>
 
         <View style={styles.progressRow}>
@@ -283,6 +288,10 @@ const styles = StyleSheet.create({
   helper: {
     fontSize: 13,
     color: '#807167',
+  },
+  debugText: {
+    fontSize: 11,
+    color: '#a08f84',
   },
   progressRow: {
     flexDirection: 'row',

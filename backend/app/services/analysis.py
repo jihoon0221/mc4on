@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 import json
 
 from sqlalchemy import select
@@ -94,7 +94,7 @@ def run_daily_analysis(
     db.commit()
 
     learning_contents = _build_learning_contents(
-        conversation.id, message_texts, ai_learning_items
+        conversation.id, target_date, message_texts, ai_learning_items
     )
     for content in learning_contents:
         db.add(content)
@@ -259,9 +259,11 @@ def _map_tag_labels(tags: list[str]) -> list[str]:
 
 def _build_learning_contents(
     conversation_id,
+    target_date: date,
     message_texts: list[str],
     ai_learning_items: list[dict[str, str]] | None = None,
 ) -> list[LearningContent]:
+    created_at = datetime.combine(target_date, datetime.min.time())
     if ai_learning_items:
         items: list[LearningContent] = []
         for item in ai_learning_items:
@@ -279,6 +281,7 @@ def _build_learning_contents(
                     LearningContent(
                         conversation_id=conversation_id,
                         content=payload,
+                        created_at=created_at,
                         content_type=LearningContentTypeEnum.sentence,
                     )
                 )
@@ -290,6 +293,7 @@ def _build_learning_contents(
                 LearningContent(
                     conversation_id=conversation_id,
                     content=content,
+                    created_at=created_at,
                     content_type=LearningContentTypeEnum.sentence,
                 )
             )
@@ -304,6 +308,7 @@ def _build_learning_contents(
     return [
         LearningContent(
             conversation_id=conversation_id,
+            created_at=created_at,
             content=f"오늘의 표현: {word}",
             content_type=LearningContentTypeEnum.word,
         )
