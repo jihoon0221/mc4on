@@ -53,7 +53,8 @@ def fetch_next_job(db: Session) -> AnalysisJob | None:
         db.execute(
             select(AnalysisJob)
             .where(AnalysisJob.status == AnalysisJobStatusEnum.pending)
-            .order_by(AnalysisJob.created_at.asc())
+            # Process earliest day first to keep summaries chronological.
+            .order_by(AnalysisJob.target_date.asc(), AnalysisJob.created_at.asc())
             .limit(1)
         )
         .scalar_one_or_none()

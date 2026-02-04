@@ -11,6 +11,29 @@ class GroqClient:
         self._api_key = api_key
         self._timeout = timeout_seconds
 
+    def generate_text(self, model: str, prompt: str) -> str | None:
+        if not self._api_key or not model:
+            return None
+        payload = {
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.2,
+            "max_tokens": 900,
+        }
+        headers = {"Authorization": f"Bearer {self._api_key}"}
+        try:
+            response = httpx.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                json=payload,
+                headers=headers,
+                timeout=self._timeout,
+            )
+            response.raise_for_status()
+            data = response.json()
+            return _extract_content(data)
+        except Exception:
+            return None
+
     def generate_json(self, model: str, prompt: str) -> dict[str, Any] | None:
         if not self._api_key or not model:
             return None
@@ -19,6 +42,7 @@ class GroqClient:
             "messages": [{"role": "user", "content": prompt}],
             "temperature": 0.2,
             "max_tokens": 900,
+            "response_format": {"type": "json_object"},
         }
         headers = {"Authorization": f"Bearer {self._api_key}"}
         try:

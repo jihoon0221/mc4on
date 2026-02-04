@@ -5,12 +5,12 @@ from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.db.deps import get_db
-from app.models.models import AnalysisResult, Conversation, TimelineEntry, User
+from app.models.models import AnalysisResult, Conversation, RiskEvent, TimelineEntry, User
 
 router = APIRouter(prefix="/timeline", tags=["timeline"])
 
@@ -79,7 +79,7 @@ def list_timeline(
     limit: int = 60,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-) -> dict[str, list[dict[str, object | None]]]:
+) -> list[dict[str, object | None]]:
     convo = db.execute(
         select(Conversation).where(
             Conversation.user_id == current_user.id,
@@ -99,20 +99,19 @@ def list_timeline(
         .limit(limit)
     ).scalars().all()
 
-    return {
-        "items": [
-            {
-                "entry_date": result.analysis_date.isoformat(),
-                "day_count": _day_count(convo, result.analysis_date),
-                "bird_state": 1 if result.warning_text else 0,
-                "summary_short": result.summary_short_text,
-                "tags": result.tags_text.split(",") if result.tags_text else [],
-                "warning_text": result.warning_text,
-                "warning_tags": result.warning_tags_text.split(",") if result.warning_tags_text else [],
-            }
-            for result in results
-        ]
-    }
+    bird_state_map = _build_bird_state_map(db, convo.id, results)
+    return [
+        {
+            "analysis_date": result.analysis_date.isoformat(),
+            "summary_short": result.summary_short_text,
+            "tags": result.tags_text.split(",") if result.tags_text else [],
+            "warning_text": result.warning_text,
+            "warning_tags": result.warning_tags_text.split(",") if result.warning_tags_text else [],
+            "risk_level": result.risk_level,
+            "bird_state": bird_state_map.get(result.id, 0),
+        }
+        for result in results
+    ]
 
 
 @router.get("/{entry_date}")
@@ -145,19 +144,53 @@ def get_timeline_entry(
             detail="Timeline entry not found.",
         )
 
+    bird_state_map = _build_bird_state_map(db, convo.id, [result])
     return {
-        "entry_date": result.analysis_date.isoformat(),
-        "day_count": _day_count(convo, result.analysis_date),
-        "bird_state": 1 if result.warning_text else 0,
+        "analysis_date": result.analysis_date.isoformat(),
         "summary_short": result.summary_short_text,
         "tags": result.tags_text.split(",") if result.tags_text else [],
         "warning_text": result.warning_text,
         "warning_tags": result.warning_tags_text.split(",") if result.warning_tags_text else [],
+        "risk_level": result.risk_level,
+        "bird_state": bird_state_map.get(result.id, 0),
     }
 
 
-def _day_count(convo: Conversation, analysis_date: date) -> int | None:
-    if not convo.created_at:
-        return None
-    start_date = convo.created_at.date()
-    return (analysis_date - start_date).days + 1
+def _build_bird_state_map(
+    db: Session,
+    conversation_id,
+    results: list[AnalysisResult],
+) -> dict[str, int]:
+    if not results:
+        return {}
+    result_ids = [r.id for r in results]
+    min_date = min(r.analysis_date for r in results)
+
+    event_dates = set(
+        db.execute(
+            select(AnalysisResult.analysis_date)
+            .join(RiskEvent, RiskEvent.analysis_id == AnalysisResult.id)
+            .where(AnalysisResult.conversation_id == conversation_id)
+            .group_by(AnalysisResult.analysis_date)
+        ).scalars().all()
+    )
+    base_count = (
+        db.execute(
+            select(func.count(func.distinct(AnalysisResult.analysis_date)))
+            .join(RiskEvent, RiskEvent.analysis_id == AnalysisResult.id)
+            .where(
+                AnalysisResult.conversation_id == conversation_id,
+                AnalysisResult.analysis_date < min_date,
+            )
+        ).scalar_one_or_none()
+        or 0
+    )
+
+    ordered = sorted(results, key=lambda r: r.analysis_date)
+    cumulative = int(base_count)
+    cumulative_map: dict[str, int] = {}
+    for r in ordered:
+        if r.analysis_date in event_dates:
+            cumulative += 1
+        cumulative_map[r.id] = cumulative
+    return {rid: cumulative_map.get(rid, 0) for rid in result_ids}

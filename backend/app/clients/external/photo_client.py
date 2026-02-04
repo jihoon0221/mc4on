@@ -48,6 +48,9 @@ class PhotoRiskClient:
         except Exception:
             return False, None
 
+    def clear_cache(self) -> None:
+        self._cache.clear()
+
 
 def _safe_raw(payload: dict) -> dict:
     return payload

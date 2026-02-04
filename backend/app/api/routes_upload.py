@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+import json
 from io import BytesIO
 import uuid
 import zipfile
@@ -32,6 +33,7 @@ from app.services.kakao_import import (
 from app.services.external_checks import check_photo
 from app.services.sensitive import detect_entities, mask_text
 from app.services.storage import store_encrypted_bytes, store_encrypted_upload
+from app.services.kakao_samples import get_sample_kakao_text
 
 router = APIRouter(prefix="/upload", tags=["upload"])
 
@@ -211,14 +213,73 @@ def upload_kakao(
         text = _decode_kakao_bytes(raw)
         zip_photos = []
     chat_file.file.seek(0)
-    messages = parse_kakao_text(text)
-    new_messages = filter_new_messages(messages, last_date)
-    new_messages = dedupe_messages(new_messages)
-    max_text_date = max_message_date(new_messages)
 
+    photo_dates, photo_flags = _ingest_photos(
+        db=db,
+        convo=convo,
+        photos=photos or [],
+        zip_photos=zip_photos,
+        last_date=last_date,
+    )
+
+    stored = _save_upload_file(chat_file)
+    return _ingest_kakao_text(
+        db=db,
+        convo=convo,
+        text=text,
+        me_name=me_name,
+        current_user=current_user,
+        webhook_url=webhook_url,
+        sync_analysis=sync_analysis,
+        last_date=last_date,
+        photo_dates=photo_dates,
+        photo_flags=photo_flags,
+        chat_raw_file_path=stored[0],
+        chat_raw_file_sha256=stored[1],
+    )
+
+
+@router.post("/kakao/sample")
+def upload_kakao_sample(
+    me_name: str | None = Form(None),
+    webhook_url: str | None = Form(None),
+    sync_analysis: bool = Form(False),
+    force: bool = Form(False),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    convo = _get_or_create_conversation(db, current_user.id)
+    last_date = None if force else convo.last_ingested_date
+
+    text = get_sample_kakao_text()
+    stored = store_encrypted_bytes(text.encode("utf-8"), "sample_kakao.txt")
+
+    return _ingest_kakao_text(
+        db=db,
+        convo=convo,
+        text=text,
+        me_name=me_name,
+        current_user=current_user,
+        webhook_url=webhook_url,
+        sync_analysis=sync_analysis,
+        last_date=last_date,
+        photo_dates=[],
+        photo_flags=[],
+        chat_raw_file_path=stored.path,
+        chat_raw_file_sha256=stored.sha256,
+    )
+
+
+def _ingest_photos(
+    db: Session,
+    convo: Conversation,
+    photos: list[UploadFile],
+    zip_photos: list[tuple[str, bytes]],
+    last_date: date | None,
+) -> tuple[list[date], list[str]]:
     photo_dates: list[date] = []
     photo_flags: list[str] = []
-    for photo in (photos or []):
+    for photo in photos:
         photo_date = extract_photo_date(photo.filename or "")
         if photo_date is None:
             continue
@@ -230,13 +291,12 @@ def upload_kakao(
         if risky:
             photo_flags.append(detail.reasons[0] if detail and detail.reasons else "photo_risk")
         stored = store_encrypted_bytes(raw, photo.filename or "photo.bin")
-        raw_file_path, raw_file_sha256 = stored.path, stored.sha256
         db.add(
             Upload(
                 conversation_id=convo.id,
                 upload_date=photo_date,
-                raw_file_path=raw_file_path,
-                raw_file_sha256=raw_file_sha256,
+                raw_file_path=stored.path,
+                raw_file_sha256=stored.sha256,
             )
         )
     for name, photo_raw in zip_photos:
@@ -258,6 +318,27 @@ def upload_kakao(
                 raw_file_sha256=stored.sha256,
             )
         )
+    return photo_dates, photo_flags
+
+
+def _ingest_kakao_text(
+    db: Session,
+    convo: Conversation,
+    text: str,
+    me_name: str | None,
+    current_user: User,
+    webhook_url: str | None,
+    sync_analysis: bool,
+    last_date: date | None,
+    photo_dates: list[date],
+    photo_flags: list[str],
+    chat_raw_file_path: str | None,
+    chat_raw_file_sha256: str | None,
+) -> dict[str, object]:
+    messages = parse_kakao_text(text)
+    new_messages = filter_new_messages(messages, last_date)
+    new_messages = dedupe_messages(new_messages)
+    max_text_date = max_message_date(new_messages)
 
     if not new_messages and not photo_dates:
         return {
@@ -272,7 +353,6 @@ def upload_kakao(
             else None,
         }
 
-    chat_raw_file_path, chat_raw_file_sha256 = _save_upload_file(chat_file)
     messages_by_date: dict[date, list] = {}
     for message in new_messages:
         msg_date = message.sent_at.date()
@@ -280,8 +360,10 @@ def upload_kakao(
 
     analysis_jobs: list[dict[str, object | None]] = []
     analysis_result = None
+    analysis_results: list[dict[str, object | None]] = []
     upload = None
-    for msg_date, day_messages in messages_by_date.items():
+    for msg_date in sorted(messages_by_date.keys()):
+        day_messages = messages_by_date[msg_date]
         upload = Upload(
             conversation_id=convo.id,
             upload_date=msg_date,
@@ -335,6 +417,16 @@ def upload_kakao(
         )
         if sync_analysis:
             analysis_result = process_job(db, job)
+            analysis_results.append(
+                _serialize_analysis_result(
+                    analysis_result,
+                    _load_learning_items(db, convo.id, analysis_result.analysis_date)
+                    if analysis_result
+                    else [],
+                )
+                if analysis_result
+                else None
+            )
 
     if new_messages:
         last_text_date = max_text_date
@@ -363,6 +455,7 @@ def upload_kakao(
         "analysis_job_id": analysis_jobs[0]["analysis_job_id"] if analysis_jobs else None,
         "analysis_status": analysis_jobs[0]["analysis_status"] if analysis_jobs else None,
         "upload_date": upload.upload_date.isoformat() if upload else None,
+        "analysis_results": [r for r in analysis_results if r is not None],
         "analysis_result": _serialize_analysis_result(analysis_result, learning_items),
         "last_ingested_date": convo.last_ingested_date.isoformat()
         if convo.last_ingested_date
@@ -380,11 +473,9 @@ def _serialize_analysis_result(
     return {
         "analysis_date": result.analysis_date.isoformat(),
         "summary_text": result.summary_text,
-        "summary_short": result.summary_short_text,
         "tags": result.tags_text.split(",") if result.tags_text else [],
         "warning_text": result.warning_text,
         "warning_tags": result.warning_tags_text.split(",") if result.warning_tags_text else [],
-        "risk_explanation_text": result.risk_explanation_text,
         "risk_level": result.risk_level,
         "learning_items": learning_payload,
     }
@@ -393,16 +484,34 @@ def _serialize_analysis_result(
 def _serialize_learning_items(
     items: list[LearningContent],
 ) -> list[dict[str, str | None]]:
-    return [
-        {
-            "content": item.content,
-            "content_type": item.content_type.value,
-            "review_due_date": item.review_due_date.isoformat()
-            if item.review_due_date
-            else None,
-        }
-        for item in items
-    ]
+    payloads: list[dict[str, str | None]] = []
+    for item in items:
+        content_kr = None
+        content_fl = None
+        raw = (item.content or "").strip()
+        if raw.startswith("{") and raw.endswith("}"):
+            try:
+                decoded = json.loads(raw)
+                content_kr = decoded.get("content_kr")
+                content_fl = decoded.get("content_fl")
+            except Exception:
+                content_kr = None
+                content_fl = None
+        if not content_kr:
+            content_kr = item.content
+        if not content_fl:
+            content_fl = content_kr
+        payloads.append(
+            {
+                "content_kr": content_kr,
+                "content_fl": content_fl,
+                "content_type": item.content_type.value,
+                "review_due_date": item.review_due_date.isoformat()
+                if item.review_due_date
+                else None,
+            }
+        )
+    return payloads
 
 
 def _load_learning_items(

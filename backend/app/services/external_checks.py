@@ -39,3 +39,9 @@ def check_account(account: str) -> tuple[bool, CheckDetail | None]:
 
 def check_photo(filename: str, data: bytes) -> tuple[bool, CheckDetail | None]:
     return _photo_client.check(filename, data)
+
+
+def clear_cache() -> None:
+    _link_client.clear_cache()
+    _account_client.clear_cache()
+    _photo_client.clear_cache()

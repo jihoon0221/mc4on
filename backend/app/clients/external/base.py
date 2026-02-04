@@ -33,3 +33,6 @@ class SimpleTTLCache:
 
     def set(self, key: str, value: Any) -> None:
         self._items[key] = (time.time() + self._ttl, value)
+
+    def clear(self) -> None:
+        self._items.clear()

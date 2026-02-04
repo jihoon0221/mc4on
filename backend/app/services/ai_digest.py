@@ -26,6 +26,10 @@ def generate_daily_digest(
     return _fallback_digest(message_texts, learning_language)
 
 
+def clear_cache() -> None:
+    _cache.clear()
+
+
 def _generate_groq_digest(
     message_texts: list[str],
     context_summaries: list[str] | None = None,
@@ -105,14 +109,16 @@ def _build_prompt(
         "문장 끝은 부드럽게 마무리하세요. 예: \"~했어요\", \"~하셨네요\", \"~처럼 보였어요\".\n"
         "태그는 제공된 목록에서만 선택하세요. 암시적 금전 요구도 태그에 포함하세요.\n"
         "tags는 최대 5개, warning_tags는 경고 근거로 사용할 항목만 0~3개로 선택하세요.\n"
-        f"학습 아이템은 {language}로 3개를 작성하세요. "
+        "학습 아이템은 한국어(content_kr)와 상대방 언어(content_fl)를 모두 작성하세요. "
+        f"content_fl은 {language}로 작성하세요. "
         "content_type은 sentence만 사용하고, 모두 완전한 문장으로 작성하세요.\n"
         f"태그 목록: {tag_list}\n"
         "이전 대화 요약(최근 흐름):\n"
         f"{context if context else '- (없음)'}\n\n"
         "오늘 대화:\n"
         f"{joined}\n\n"
-        "JSON으로 summary, tags, warning_tags, learning_items만 반환하세요."
+        "JSON으로 summary, tags, warning_tags, learning_items만 반환하세요.\n"
+        "learning_items는 content_kr, content_fl, content_type 필드를 포함하세요."
     )
 
 
@@ -120,23 +126,28 @@ def _fallback_learning_items(
     message_texts: list[str],
     learning_language: str | None = None,
 ) -> list[dict[str, str]]:
-    sample = " ".join(message_texts[:2]).strip()
+    sample = " ".join(message_texts[:2]).strip().lower()
     language = (learning_language or "en").lower()
-    if language.startswith("ko"):
-        items = [
-            {"content": "오늘도 안부를 전할 수 있어 기뻐요.", "content_type": "sentence"},
-            {"content": "천천히 확인해도 괜찮아요.", "content_type": "sentence"},
-            {"content": "부담 없이 대화를 이어가요.", "content_type": "sentence"},
-        ]
-        return items
-    items = [
-        {"content": "I hope you're doing well.", "content_type": "sentence"},
-        {"content": "I appreciate your message.", "content_type": "sentence"},
-        {"content": "It's okay to take things slowly.", "content_type": "sentence"},
+    items_kr = [
+        "오늘도 안부를 전할 수 있어 기뻐요.",
+        "천천히 확인해도 괜찮아요.",
+        "부담 없이 대화를 이어가요.",
     ]
-    if "thank" in sample.lower():
-        items[2] = {"content": "Thank you for sharing that with me.", "content_type": "sentence"}
-    return items
+    items_fl = [
+        "I hope you're doing well.",
+        "I appreciate your message.",
+        "It's okay to take things slowly.",
+    ]
+    if "thank" in sample:
+        items_fl[2] = "Thank you for sharing that with me."
+    return [
+        {
+            "content_kr": items_kr[idx],
+            "content_fl": items_fl[idx],
+            "content_type": "sentence",
+        }
+        for idx in range(3)
+    ]
 
 
 def _normalize_learning_items(
@@ -148,11 +159,18 @@ def _normalize_learning_items(
         for item in value:
             if not isinstance(item, dict):
                 continue
-            content = item.get("content")
+            content_kr = item.get("content_kr")
+            content_fl = item.get("content_fl")
             content_type = item.get("content_type")
-            if not content or content_type != "sentence":
+            if not content_kr or not content_fl or content_type != "sentence":
                 continue
-            items.append({"content": content, "content_type": "sentence"})
+            items.append(
+                {
+                    "content_kr": str(content_kr),
+                    "content_fl": str(content_fl),
+                    "content_type": "sentence",
+                }
+            )
     if len(items) >= 3:
         return items[:3]
     return _fallback_learning_items([], learning_language)
