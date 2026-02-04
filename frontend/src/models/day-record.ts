@@ -14,6 +14,12 @@ export type ImmediateRisk = {
   aiImage: boolean;
 };
 
+export type LearningItem = {
+  content: string;
+  contentType: string;
+  reviewDueDate: string | null;
+};
+
 export type DayRecord = {
   id: string;
   date: string; // YYYY-MM-DD
@@ -22,6 +28,12 @@ export type DayRecord = {
   extractedSentences: string[];
   nativeSentences?: string[];
   flags: DayFlags;
+  summaryText?: string;
+  summaryShort?: string;
+  summaryTags?: string[];
+  warningText?: string | null;
+  warningTags?: string[];
+  learningItems?: LearningItem[];
   uploadCount: number;
   learned: boolean;
   birdState?: BirdState;
@@ -37,4 +49,10 @@ export type CreateTodayRecordInput = {
   immediateRisk?: ImmediateRisk;
   nativeSentences?: string[];
   sourceFileName?: string;
+  summaryText?: string;
+  summaryShort?: string;
+  summaryTags?: string[];
+  warningText?: string | null;
+  warningTags?: string[];
+  learningItems?: LearningItem[];
 };

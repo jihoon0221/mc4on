@@ -4,42 +4,102 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import LearnScreen from '@/src/screens/LearnScreen';
 import { useDayRecords } from '@/src/context/day-records-context';
+import { useTimeline } from '@/src/context/timeline-context';
 import { getSeoulDateKey } from '@/src/utils/date';
+import { clearPendingBatchDates, loadPendingBatchDates } from '@/src/storage/batch-memo-storage';
 
 export default function LearnNotepadModal() {
   const { records } = useDayRecords();
+  const { entries: timelineEntries, reload: reloadTimeline } = useTimeline();
   const todayKey = useMemo(() => getSeoulDateKey(), []);
   const todayRecord = useMemo(
     () => records.find((record) => record.date === todayKey),
     [records, todayKey]
   );
 
-  const insightLines = useMemo(() => {
-    if (!todayRecord) return [];
-    const flags = todayRecord.flags;
-    const lines: string[] = [];
-    if (flags.moneyRequest) lines.push('금전 관련 표현이 있었어요.');
-    if (flags.favorRequest) lines.push('부탁/도움 요청이 있었어요.');
-    if (flags.excessivePraise) lines.push('과한 칭찬 표현이 있었어요.');
-    if (flags.linkIncluded) lines.push('외부 링크가 포함됐어요.');
-    if (flags.imageIncluded) lines.push('이미지가 포함됐어요.');
-    return lines.slice(0, 3);
-  }, [todayRecord]);
+  const [batchMemo, setBatchMemo] = React.useState<string | null>(null);
+  const [hasBatchMemo, setHasBatchMemo] = React.useState(false);
+
+  React.useEffect(() => {
+    let active = true;
+    const buildMemo = async () => {
+      const dates = await loadPendingBatchDates();
+      if (!active || dates.length === 0) return;
+      await reloadTimeline();
+      const byDate = new Map(timelineEntries.map((entry) => [entry.date, entry]));
+      const missing = dates.filter((date) => !byDate.has(date));
+      if (missing.length > 0) return;
+      const lines = dates
+        .slice()
+        .sort()
+        .map((date) => {
+          const entry = byDate.get(date);
+          const text = entry?.summary ?? entry?.warningText ?? '요약이 준비 중이에요.';
+          return `${date.replace(/-/g, '.')} · ${text}`;
+        });
+      if (!active) return;
+      setBatchMemo(lines.join('\n'));
+      setHasBatchMemo(true);
+      await clearPendingBatchDates();
+    };
+    void buildMemo();
+    return () => {
+      active = false;
+    };
+  }, [reloadTimeline, timelineEntries]);
 
   const insightContent = (
     <View>
-      <Text style={styles.insightTitle}>오늘의 분석</Text>
-      {insightLines.length === 0 ? (
-        <Text style={styles.insightBody}>오늘은 특별한 징후 없이 조용히 흘러갔어요.</Text>
+      {hasBatchMemo && batchMemo ? (
+        <View style={styles.batchWrap}>
+          <Text style={styles.insightTitle}>최근 대화 메모</Text>
+          <Text style={styles.insightBody}>{batchMemo}</Text>
+        </View>
+      ) : null}
+      <Text style={styles.insightTitle}>오늘의 요약</Text>
+      {todayRecord?.summaryText ? (
+        <Text style={styles.insightBody}>{todayRecord.summaryText}</Text>
       ) : (
-        <View style={styles.insightList}>
-          {insightLines.map((line) => (
-            <Text key={line} style={styles.insightBody}>
-              {line}
+        <Text style={styles.insightBody}>요약을 준비 중이에요.</Text>
+      )}
+
+      {todayRecord?.summaryTags && todayRecord.summaryTags.length > 0 ? (
+        <View style={styles.tagRow}>
+          {todayRecord.summaryTags.map((tag) => (
+            <View key={tag} style={styles.tagChip}>
+              <Text style={styles.tagText}>#{tag.replace(/^#/, '')}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+
+      <Text style={styles.insightTitle}>주의 메시지</Text>
+      {todayRecord?.warningText ? (
+        <Text style={styles.insightBody}>{todayRecord.warningText}</Text>
+      ) : (
+        <Text style={styles.insightBody}>아직은 조용한 흐름이에요.</Text>
+      )}
+
+      {todayRecord?.warningTags && todayRecord.warningTags.length > 0 ? (
+        <View style={styles.tagRow}>
+          {todayRecord.warningTags.map((tag) => (
+            <View key={tag} style={styles.tagChip}>
+              <Text style={styles.tagText}>#{tag.replace(/^#/, '')}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+
+      {todayRecord?.learningItems && todayRecord.learningItems.length > 0 ? (
+        <View style={styles.learningWrap}>
+          <Text style={styles.insightTitle}>오늘의 표현</Text>
+          {todayRecord.learningItems.slice(0, 3).map((item, index) => (
+            <Text key={`${item.content}-${index}`} style={styles.insightBody}>
+              {item.content}
             </Text>
           ))}
         </View>
-      )}
+      ) : null}
     </View>
   );
 
@@ -112,6 +172,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#6e5f54',
     marginBottom: 6,
+    marginTop: 12,
   },
   insightList: {
     gap: 4,
@@ -120,5 +181,33 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#7b6c62',
     lineHeight: 18,
+  },
+  tagRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 8,
+  },
+  tagChip: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    borderWidth: 1,
+    borderColor: 'rgba(199, 171, 154, 0.35)',
+  },
+  tagText: {
+    fontSize: 11,
+    color: '#7b6c62',
+  },
+  learningWrap: {
+    marginTop: 8,
+    gap: 4,
+  },
+  batchWrap: {
+    marginBottom: 12,
+    padding: 10,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.6)',
   },
 });

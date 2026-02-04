@@ -39,3 +39,27 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
 
   return (await response.json()) as T;
 }
+
+export async function apiUpload<T>(path: string, formData: FormData): Promise<T> {
+  const url = `${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
+  const headers = new Headers();
+  if (authToken) {
+    headers.set('Authorization', `Bearer ${authToken}`);
+  }
+  const response = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText || `Request failed with ${response.status}`);
+  }
+
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  return (await response.json()) as T;
+}
