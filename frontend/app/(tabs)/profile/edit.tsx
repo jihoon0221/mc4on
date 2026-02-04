@@ -4,7 +4,6 @@ import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Image, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import TopBar from '@/src/components/TopBar';
 import { useProfile } from '@/src/context/profile-context';
 import type { Profile } from '@/src/models/profile';
 
@@ -73,7 +72,6 @@ export default function ProfileEditScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-        <TopBar />
         <Pressable style={styles.backRow} onPress={() => router.back()} accessibilityRole="button">
           <Ionicons name="chevron-back" size={20} color="#6f6258" />
           <Text style={styles.backText}>돌아가기</Text>
@@ -176,8 +174,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8f0eb',
   },
   container: {
-    padding: 16,
-    gap: 14,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 24,
+    gap: 12,
   },
   backRow: {
     flexDirection: 'row',
@@ -189,7 +189,7 @@ const styles = StyleSheet.create({
     color: '#7b6c62',
   },
   title: {
-    fontSize: 26,
+    fontSize: 22,
     fontWeight: '700',
     color: '#5f5147',
   },

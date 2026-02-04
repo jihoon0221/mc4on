@@ -64,6 +64,7 @@ export function DayRecordsProvider({ children }: { children: React.ReactNode }) 
           nativeSentences: input.nativeSentences ?? existing.nativeSentences,
           sourceFileName: input.sourceFileName ?? existing.sourceFileName,
           flags: input.flags,
+          analysisResult: input.analysisResult ?? existing.analysisResult,
           immediateRisk: input.immediateRisk ?? existing.immediateRisk ?? {
             scamUrl: false,
             reportedAccount: false,
@@ -84,6 +85,7 @@ export function DayRecordsProvider({ children }: { children: React.ReactNode }) 
           extractedSentences: input.extractedSentences,
           nativeSentences: input.nativeSentences,
           flags: input.flags,
+          analysisResult: input.analysisResult,
           uploadCount: 1,
           learned: false,
           immediateRisk: input.immediateRisk ?? {

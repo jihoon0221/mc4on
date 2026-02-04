@@ -8,6 +8,7 @@ import LearnCard from '@/src/components/LearnCard';
 import ProgressDots from '@/src/components/ProgressDots';
 import { useDayRecords } from '@/src/context/day-records-context';
 import { useTimeline } from '@/src/context/timeline-context';
+import type { AnalysisResult, LearningItem } from '@/src/models/analysis-result';
 import type { BirdState } from '@/src/models/bird-state';
 import type { DayRecord } from '@/src/models/day-record';
 import { formatDateLabel, getSeoulDateKey } from '@/src/utils/date';
@@ -16,6 +17,7 @@ type LearnScreenProps = {
   onCompleted?: (record: DayRecord) => void | Promise<void>;
   closeOnComplete?: boolean;
   insightContent?: React.ReactNode;
+  analysisResult?: AnalysisResult | null;
 };
 
 function deriveBirdState(record: DayRecord): BirdState {
@@ -43,7 +45,12 @@ function buildTags(record: DayRecord): string[] {
   return tags;
 }
 
-export default function LearnScreen({ onCompleted, closeOnComplete = false, insightContent }: LearnScreenProps) {
+export default function LearnScreen({
+  onCompleted,
+  closeOnComplete = false,
+  insightContent,
+  analysisResult,
+}: LearnScreenProps) {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const scrollRef = useRef<ScrollView | null>(null);
@@ -55,6 +62,7 @@ export default function LearnScreen({ onCompleted, closeOnComplete = false, insi
     () => records.find((record) => record.date === todayKey),
     [records, todayKey]
   );
+  const analysis = (analysisResult ?? todayRecord?.analysisResult ?? null) as AnalysisResult | null;
 
   const demoSentences = [
     '오늘은 조금 천천히 이야기하고 싶어.',
@@ -67,9 +75,18 @@ export default function LearnScreen({ onCompleted, closeOnComplete = false, insi
     'Could you send just one more photo?',
   ];
 
-  const useDemo = !todayRecord || (todayRecord.nativeSentences?.length ?? 0) === 0;
-  const sentences = (useDemo ? demoSentences : todayRecord?.extractedSentences ?? []).slice(0, 3);
-  const nativeSentences = useDemo ? demoNativeSentences : todayRecord?.nativeSentences ?? [];
+  const learningItems: LearningItem[] = analysis?.learning_items ?? [];
+  const useDemo = learningItems.length === 0 && (!todayRecord || (todayRecord.nativeSentences?.length ?? 0) === 0);
+  const sentences = useDemo
+    ? demoSentences
+    : learningItems.length > 0
+      ? learningItems.map((item) => item.content_kr)
+      : (todayRecord?.extractedSentences ?? []).slice(0, 3);
+  const nativeSentences = useDemo
+    ? demoNativeSentences
+    : learningItems.length > 0
+      ? learningItems.map((item) => item.content_fl)
+      : todayRecord?.nativeSentences ?? [];
   const learned = todayRecord?.learned ?? false;
 
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -120,12 +137,12 @@ export default function LearnScreen({ onCompleted, closeOnComplete = false, insi
     if (!updated) return;
     setCompleteMessage('오늘 학습을 마쳤어요.');
 
-    const summary = todayRecord.extractedSentences?.[0] ?? '오늘의 대화를 기록했어요.';
+    const summary = analysis?.summary_text ?? todayRecord.extractedSentences?.[0] ?? '오늘의 대화를 기록했어요.';
     await addEntry({
       id: todayKey,
       date: todayKey,
       summary,
-      tags: buildTags(todayRecord),
+      tags: analysis?.tags ?? buildTags(todayRecord),
       birdState,
       createdAt: new Date().toISOString(),
       sourceFileName: todayRecord.sourceFileName,
@@ -144,7 +161,9 @@ export default function LearnScreen({ onCompleted, closeOnComplete = false, insi
       <View style={styles.container}>
         <View style={styles.header}>
           <Text style={styles.title}>오늘의 학습</Text>
-          <Text style={styles.subtitle}>{useDemo ? '오늘' : formatDateLabel(todayKey)}</Text>
+          <Text style={styles.subtitle}>
+            {analysis?.analysis_date ? formatDateLabel(analysis.analysis_date) : useDemo ? '오늘' : formatDateLabel(todayKey)}
+          </Text>
           <Text style={styles.helper}>상대의 말, 상대의 언어로 다시 말해봐요.</Text>
         </View>
 
@@ -184,7 +203,45 @@ export default function LearnScreen({ onCompleted, closeOnComplete = false, insi
 
         <InlineToast message={toastMessage} visible={toastVisible} />
 
-        {insightContent ? <View style={styles.insightWrap}>{insightContent}</View> : null}
+        {analysis ? (
+          <View style={styles.insightWrap}>
+            <Text style={styles.insightTitle}>오늘의 분석</Text>
+            {analysis.summary_text ? (
+              <Text style={styles.insightBody}>{analysis.summary_text}</Text>
+            ) : (
+              <Text style={styles.insightBody}>오늘은 특별한 요약이 없어요.</Text>
+            )}
+            {analysis.tags?.length ? (
+              <View style={styles.tagRow}>
+                {analysis.tags.map((tag) => (
+                  <View key={tag} style={styles.tagChip}>
+                    <Text style={styles.tagText}>#{tag}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+            {analysis.warning_text ? (
+              <View style={styles.warningWrap}>
+                <Text style={styles.warningTitle}>주의 메시지</Text>
+                <Text style={styles.warningBody}>{analysis.warning_text}</Text>
+                {analysis.warning_tags?.length ? (
+                  <View style={styles.tagRow}>
+                    {analysis.warning_tags.map((tag) => (
+                      <View key={tag} style={styles.warningChip}>
+                        <Text style={styles.warningText}>#{tag}</Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
+              </View>
+            ) : null}
+            {analysis.risk_level != null ? (
+              <Text style={styles.riskLevel}>위험도 {analysis.risk_level}</Text>
+            ) : null}
+          </View>
+        ) : insightContent ? (
+          <View style={styles.insightWrap}>{insightContent}</View>
+        ) : null}
 
         <Pressable
           style={[styles.completeButton, (!canComplete || learned) && styles.completeButtonDisabled]}
@@ -271,5 +328,65 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: '#f7eeea',
     padding: 12,
+  },
+  insightTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6e5f54',
+    marginBottom: 6,
+  },
+  insightBody: {
+    fontSize: 12,
+    color: '#7b6c62',
+    lineHeight: 18,
+  },
+  tagRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 8,
+  },
+  tagChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: 'rgba(232, 202, 191, 0.5)',
+  },
+  tagText: {
+    fontSize: 11,
+    color: '#7b6c62',
+  },
+  warningWrap: {
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(160, 132, 112, 0.18)',
+    gap: 4,
+  },
+  warningTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#7c5e55',
+  },
+  warningBody: {
+    fontSize: 12,
+    color: '#6f5d52',
+    lineHeight: 18,
+  },
+  warningChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: 'rgba(202, 162, 142, 0.35)',
+  },
+  warningText: {
+    fontSize: 11,
+    color: '#7b5a52',
+  },
+  riskLevel: {
+    marginTop: 8,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#8a6e63',
   },
 });

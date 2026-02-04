@@ -7,6 +7,7 @@ export type DayFlags = {
 };
 
 import type { BirdState } from '@/src/models/bird-state';
+import type { AnalysisResult } from '@/src/models/analysis-result';
 
 export type ImmediateRisk = {
   scamUrl: boolean;
@@ -27,6 +28,7 @@ export type DayRecord = {
   birdState?: BirdState;
   immediateRisk: ImmediateRisk;
   immediateRiskShown: boolean;
+  analysisResult?: AnalysisResult;
   createdAt: string;
   updatedAt: string;
 };
@@ -37,4 +39,5 @@ export type CreateTodayRecordInput = {
   immediateRisk?: ImmediateRisk;
   nativeSentences?: string[];
   sourceFileName?: string;
+  analysisResult?: AnalysisResult;
 };

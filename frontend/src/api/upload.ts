@@ -1,10 +1,13 @@
 import { apiUpload } from '@/src/api/client';
+import type { AnalysisResult, LearningItem } from '@/src/models/analysis-result';
 
-type LearningItem = {
-  content: string;
-  content_type: string;
-  review_due_date: string | null;
-};
+type LearningItemResponse =
+  | LearningItem
+  | {
+      content: string;
+      content_type: string;
+      review_due_date: string | null;
+    };
 
 export type KakaoUploadResponse = {
   conversation_id: string;
@@ -20,17 +23,7 @@ export type KakaoUploadResponse = {
   }>;
   last_ingested_date: string | null;
   upload_date?: string | null;
-  analysis_result: null | {
-    analysis_date: string;
-    summary_text: string | null;
-    summary_short: string | null;
-    tags: string[];
-    warning_text: string | null;
-    warning_tags: string[];
-    risk_explanation_text: string | null;
-    risk_level: number | null;
-    learning_items?: LearningItem[];
-  };
+  analysis_result: null | (Omit<AnalysisResult, 'learning_items'> & { learning_items?: LearningItemResponse[] });
 };
 
 type KakaoUploadInput = {
@@ -41,6 +34,7 @@ type KakaoUploadInput = {
   };
   meName?: string | null;
   force?: boolean;
+  syncAnalysis?: boolean;
 };
 
 export async function uploadKakao(input: KakaoUploadInput): Promise<KakaoUploadResponse> {
@@ -50,7 +44,7 @@ export async function uploadKakao(input: KakaoUploadInput): Promise<KakaoUploadR
     name: input.file.name,
     type: input.file.mimeType ?? 'text/plain',
   } as unknown as Blob);
-  formData.append('sync_analysis', 'false');
+  formData.append('sync_analysis', input.syncAnalysis ? 'true' : 'false');
   if (input.meName) {
     formData.append('me_name', input.meName);
   }

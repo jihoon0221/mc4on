@@ -14,11 +14,13 @@ import {
   View,
 } from 'react-native';
 
+import { uploadKakao, type KakaoUploadResponse } from '@/src/api/upload';
 import BirdCharacter, { type BirdState } from '@/src/components/BirdCharacter';
 import Nest from '@/src/components/Nest';
 import SettingsMenu from '@/src/components/SettingsMenu';
 import TopBar from '@/src/components/TopBar';
 import { useDayRecords } from '@/src/context/day-records-context';
+import type { AnalysisResult } from '@/src/models/analysis-result';
 import type { BirdState as ModelBirdState } from '@/src/models/bird-state';
 import { getSeoulDateKey } from '@/src/utils/date';
 import { parseKakaoFile, type ParsedConversation } from '@/src/utils/kakaoImport';
@@ -48,6 +50,34 @@ function mapBirdStateToVisual(state?: ModelBirdState): BirdState | null {
   if (state === 'relieved') return 'healthy';
   if (state === 'growing') return 'healthy';
   return null;
+}
+
+function normalizeAnalysisResult(input: KakaoUploadResponse['analysis_result']): AnalysisResult | undefined {
+  if (!input) return undefined;
+  return {
+    analysis_date: input.analysis_date,
+    summary_text: input.summary_text ?? null,
+    tags: input.tags ?? [],
+    warning_text: input.warning_text ?? null,
+    warning_tags: input.warning_tags ?? [],
+    risk_level: input.risk_level ?? null,
+    learning_items: (input.learning_items ?? []).map((item) => {
+      if ('content_kr' in item) {
+        return {
+          content_kr: item.content_kr,
+          content_fl: item.content_fl,
+          content_type: item.content_type,
+          review_due_date: item.review_due_date ?? null,
+        };
+      }
+      return {
+        content_kr: item.content,
+        content_fl: '',
+        content_type: item.content_type,
+        review_due_date: item.review_due_date ?? null,
+      };
+    }),
+  };
 }
 
 export default function HomeScreen() {
@@ -331,11 +361,29 @@ export default function HomeScreen() {
 
       const parsed = await parseKakaoFile(targetUri, file.name);
       setParsedConversation(parsed);
+
+      let analysisResult: AnalysisResult | undefined;
+      try {
+        const response = await uploadKakao({
+          file: {
+            uri: targetUri,
+            name: file.name,
+            mimeType: file.mimeType ?? undefined,
+          },
+          syncAnalysis: true,
+        });
+        analysisResult = normalizeAnalysisResult(response.analysis_result);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : '';
+        setImportError(message ? `분석 서버 연결에 실패했어요: ${message}` : '분석 서버 연결에 실패했어요.');
+      }
+
       const updated = await addOrUpdateToday({
         extractedSentences: parsed.messages.slice(0, 3),
         nativeSentences: undefined,
         flags: parsed.flags,
         sourceFileName: file.name,
+        analysisResult,
       });
       if (updated) {
         setFeedReady(true);

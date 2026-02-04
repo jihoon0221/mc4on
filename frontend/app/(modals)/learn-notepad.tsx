@@ -13,6 +13,7 @@ export default function LearnNotepadModal() {
     () => records.find((record) => record.date === todayKey),
     [records, todayKey]
   );
+  const analysisResult = todayRecord?.analysisResult ?? null;
 
   const insightLines = useMemo(() => {
     if (!todayRecord) return [];
@@ -54,7 +55,7 @@ export default function LearnNotepadModal() {
           </Pressable>
         </View>
         <View style={styles.content}>
-          <LearnScreen closeOnComplete insightContent={insightContent} />
+          <LearnScreen closeOnComplete insightContent={insightContent} analysisResult={analysisResult} />
         </View>
       </View>
     </View>
