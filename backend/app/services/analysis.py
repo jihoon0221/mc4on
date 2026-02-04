@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
+import json
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -264,9 +265,26 @@ def _build_learning_contents(
     if ai_learning_items:
         items: list[LearningContent] = []
         for item in ai_learning_items:
-            content = item.get("content")
             content_type = item.get("content_type")
-            if not content or not content_type:
+            if content_type != "sentence":
+                continue
+            content_kr = item.get("content_kr")
+            content_fl = item.get("content_fl")
+            if content_kr and content_fl:
+                payload = json.dumps(
+                    {"content_kr": content_kr, "content_fl": content_fl},
+                    ensure_ascii=False,
+                )
+                items.append(
+                    LearningContent(
+                        conversation_id=conversation_id,
+                        content=payload,
+                        content_type=LearningContentTypeEnum.sentence,
+                    )
+                )
+                continue
+            content = item.get("content")
+            if not content:
                 continue
             items.append(
                 LearningContent(

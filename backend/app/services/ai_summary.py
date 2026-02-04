@@ -23,11 +23,18 @@ def generate_summary(message_texts: list[str]) -> str | None:
             return cached
         prompt = _build_prompt(normalized)
         response = _groq_client.generate_json(settings.groq_model_summary, prompt)
-        if response and response.get("summary"):
-            summary = response.get("summary")
+        summary = response.get("summary") if response else None
+        if not summary:
+            text = _groq_client.generate_text(settings.groq_model_summary, prompt)
+            summary = _extract_summary_from_text(text)
+        if summary:
             _cache.set(cache_key, summary)
             return summary
     return None
+
+
+def clear_cache() -> None:
+    _cache.clear()
 
 
 def _normalize_messages(message_texts: list[str]) -> list[str]:
@@ -55,3 +62,14 @@ def _build_prompt(messages: list[str]) -> str:
         "결과는 JSON으로 summary 필드만 반환하세요.\n\n"
         f"{joined}"
     )
+
+
+def _extract_summary_from_text(text: str | None) -> str | None:
+    if not text:
+        return None
+    cleaned = text.strip()
+    if not cleaned:
+        return None
+    if cleaned.startswith("{") and "summary" in cleaned:
+        return None
+    return cleaned
