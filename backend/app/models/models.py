@@ -224,7 +224,11 @@ class AnalysisJob(Base):
     )
     target_date: Mapped[Date] = mapped_column(Date, nullable=False)
     status: Mapped[AnalysisJobStatusEnum] = mapped_column(
-        SAEnum(AnalysisJobStatusEnum, name="analysis_job_status_enum"),
+        SAEnum(
+            AnalysisJobStatusEnum,
+            name="analysis_job_status_enum",
+            values_callable=lambda enum_cls: [e.value for e in enum_cls],
+        ),
         nullable=False,
         server_default="PENDING",
     )

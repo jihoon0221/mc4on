@@ -2,16 +2,15 @@ from __future__ import annotations
 
 from typing import Iterable
 
-from app.clients.openai_client import OpenAIClient
+from app.clients.groq_client import GroqClient
 from app.core.config import settings
 from app.domain.taxonomy import TAG_TAXONOMY
 from app.models.models import RiskEvent
 
 
-_client = OpenAIClient(
-    api_key=settings.openai_api_key,
-    base_url=settings.openai_base_url,
-    timeout_seconds=settings.openai_timeout_seconds,
+_client = GroqClient(
+    api_key=settings.groq_api_key,
+    timeout_seconds=settings.groq_timeout_seconds,
 )
 
 
@@ -19,29 +18,14 @@ def generate_risk_explanation_tags(
     message_texts: list[str],
     events: Iterable[RiskEvent],
 ) -> tuple[str | None, list[str]]:
-    if not settings.openai_model_risk:
+    if not settings.groq_model_risk:
         return None, []
     event_payload = [
         {"type": e.event_type, "severity": e.severity}
         for e in list(events)[:10]
     ]
     prompt = _build_prompt(event_payload, list(TAG_TAXONOMY))
-    schema = {
-        "name": "risk_schema",
-        "schema": {
-            "type": "object",
-            "properties": {
-                "explanation": {"type": ["string", "null"]},
-                "tags": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                },
-            },
-            "required": ["explanation", "tags"],
-            "additionalProperties": False,
-        },
-    }
-    response = _client.structured_response(settings.openai_model_risk, prompt, schema)
+    response = _client.generate_json(settings.groq_model_risk, prompt)
     if not response:
         return None, []
     tags = [t for t in response.get("tags", []) if t in TAG_TAXONOMY]

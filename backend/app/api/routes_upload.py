@@ -1,16 +1,25 @@
 from __future__ import annotations
 
 from datetime import date
+from io import BytesIO
 import uuid
+import zipfile
 
-from fastapi import APIRouter, Depends, File, Form, UploadFile
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.core.crypto import encrypt_text
 from app.db.deps import get_db
-from app.models.models import AnalysisResult, Conversation, DetectedEntity, Message, MessageTypeEnum
+from app.models.models import (
+    AnalysisResult,
+    Conversation,
+    DetectedEntity,
+    LearningContent,
+    Message,
+    MessageTypeEnum,
+)
 from app.models.models import SenderEnum, Upload, User
 from app.services.analysis_jobs import enqueue_analysis_job, process_job
 from app.services.kakao_import import (
@@ -114,12 +123,18 @@ def upload(
     )
 
     analysis_result = process_job(db, job) if sync_analysis else None
+    learning_items = (
+        _load_learning_items(db, convo.id, analysis_result.analysis_date)
+        if analysis_result
+        else []
+    )
     return {
         "upload_id": str(upload.id),
         "conversation_id": str(convo.id),
         "analysis_job_id": str(job.id),
         "analysis_status": job.status.value,
-        "analysis_result": _serialize_analysis_result(analysis_result),
+        "upload_date": upload.upload_date.isoformat(),
+        "analysis_result": _serialize_analysis_result(analysis_result, learning_items),
     }
 
 
@@ -141,21 +156,60 @@ def _decode_kakao_bytes(raw: bytes) -> str:
         return raw.decode("cp949", errors="replace")
 
 
+def _extract_zip_payload(raw: bytes) -> tuple[str, list[tuple[str, bytes]]]:
+    try:
+        with zipfile.ZipFile(BytesIO(raw)) as zf:
+            files = [info for info in zf.infolist() if not info.is_dir()]
+            if not files:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="zip_no_files",
+                )
+            txt_candidates = [f for f in files if f.filename.lower().endswith(".txt")]
+            txt_info = txt_candidates[0] if txt_candidates else None
+            if txt_info is None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="zip_no_txt",
+                )
+            text_raw = zf.read(txt_info)
+            text = _decode_kakao_bytes(text_raw)
+
+            image_extensions = (".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic")
+            photos: list[tuple[str, bytes]] = []
+            for info in files:
+                name = info.filename
+                if name.lower().endswith(image_extensions):
+                    photos.append((name, zf.read(info)))
+            return text, photos
+    except zipfile.BadZipFile as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="zip_parse_failed",
+        ) from exc
+
+
 @router.post("/kakao")
 def upload_kakao(
     chat_file: UploadFile = File(...),
     me_name: str | None = Form(None),
     webhook_url: str | None = Form(None),
     sync_analysis: bool = Form(False),
+    force: bool = Form(False),
     photos: list[UploadFile] | None = File(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> dict[str, object]:
     convo = _get_or_create_conversation(db, current_user.id)
-    last_date = convo.last_ingested_date
+    last_date = None if force else convo.last_ingested_date
 
     raw = chat_file.file.read()
-    text = _decode_kakao_bytes(raw)
+    is_zip = zipfile.is_zipfile(BytesIO(raw))
+    if is_zip:
+        text, zip_photos = _extract_zip_payload(raw)
+    else:
+        text = _decode_kakao_bytes(raw)
+        zip_photos = []
     chat_file.file.seek(0)
     messages = parse_kakao_text(text)
     new_messages = filter_new_messages(messages, last_date)
@@ -164,7 +218,7 @@ def upload_kakao(
 
     photo_dates: list[date] = []
     photo_flags: list[str] = []
-    for photo in photos or []:
+    for photo in (photos or []):
         photo_date = extract_photo_date(photo.filename or "")
         if photo_date is None:
             continue
@@ -185,6 +239,25 @@ def upload_kakao(
                 raw_file_sha256=raw_file_sha256,
             )
         )
+    for name, photo_raw in zip_photos:
+        photo_date = extract_photo_date(name)
+        if photo_date is None:
+            continue
+        if last_date and photo_date <= last_date:
+            continue
+        photo_dates.append(photo_date)
+        risky, detail = check_photo(name, photo_raw)
+        if risky:
+            photo_flags.append(detail.reasons[0] if detail and detail.reasons else "photo_risk")
+        stored = store_encrypted_bytes(photo_raw, name)
+        db.add(
+            Upload(
+                conversation_id=convo.id,
+                upload_date=photo_date,
+                raw_file_path=stored.path,
+                raw_file_sha256=stored.sha256,
+            )
+        )
 
     if not new_messages and not photo_dates:
         return {
@@ -200,46 +273,68 @@ def upload_kakao(
         }
 
     chat_raw_file_path, chat_raw_file_sha256 = _save_upload_file(chat_file)
-    upload = Upload(
-        conversation_id=convo.id,
-        upload_date=max_text_date or date.today(),
-        raw_file_path=chat_raw_file_path,
-        raw_file_sha256=chat_raw_file_sha256,
-    )
-    db.add(upload)
-    db.commit()
-    db.refresh(upload)
-
+    messages_by_date: dict[date, list] = {}
     for message in new_messages:
-        sender = _resolve_sender(message.sender_name, me_name, current_user)
-        entities = detect_entities(message.content)
-        masked_text = mask_text(message.content) if sender == SenderEnum.me else None
-        encrypted_text = encrypt_text(message.content)
-        message_row = Message(
-            upload_id=upload.id,
-            sender=sender,
-            sent_at=message.sent_at,
-            content_encrypted=encrypted_text,
-            content_masked=masked_text,
-            message_type=MessageTypeEnum.text,
-            has_sensitive=bool(entities),
-        )
-        db.add(message_row)
-        db.flush()
-        for entity_type, entity_value in entities:
-            db.add(
-                DetectedEntity(
-                    message_id=message_row.id,
-                    entity_type=entity_type,
-                    entity_value=entity_value,
-                )
-            )
-    db.commit()
+        msg_date = message.sent_at.date()
+        messages_by_date.setdefault(msg_date, []).append(message)
 
-    message_texts = [m.content for m in new_messages]
-    all_entities: list[tuple] = []
-    for msg in new_messages:
-        all_entities.extend(detect_entities(msg.content))
+    analysis_jobs: list[dict[str, object | None]] = []
+    analysis_result = None
+    upload = None
+    for msg_date, day_messages in messages_by_date.items():
+        upload = Upload(
+            conversation_id=convo.id,
+            upload_date=msg_date,
+            raw_file_path=chat_raw_file_path,
+            raw_file_sha256=chat_raw_file_sha256,
+        )
+        db.add(upload)
+        db.commit()
+        db.refresh(upload)
+
+        for message in day_messages:
+            sender = _resolve_sender(message.sender_name, me_name, current_user)
+            entities = detect_entities(message.content)
+            masked_text = mask_text(message.content) if sender == SenderEnum.me else None
+            encrypted_text = encrypt_text(message.content)
+            message_row = Message(
+                upload_id=upload.id,
+                sender=sender,
+                sent_at=message.sent_at,
+                content_encrypted=encrypted_text,
+                content_masked=masked_text,
+                message_type=MessageTypeEnum.text,
+                has_sensitive=bool(entities),
+            )
+            db.add(message_row)
+            db.flush()
+            for entity_type, entity_value in entities:
+                db.add(
+                    DetectedEntity(
+                        message_id=message_row.id,
+                        entity_type=entity_type,
+                        entity_value=entity_value,
+                    )
+                )
+        db.commit()
+
+        job = enqueue_analysis_job(
+            db=db,
+            conversation_id=convo.id,
+            upload_id=upload.id,
+            target_date=msg_date,
+            webhook_url=webhook_url,
+            photo_flags=photo_flags,
+        )
+        analysis_jobs.append(
+            {
+                "analysis_date": msg_date.isoformat(),
+                "analysis_job_id": str(job.id),
+                "analysis_status": job.status.value,
+            }
+        )
+        if sync_analysis:
+            analysis_result = process_job(db, job)
 
     if new_messages:
         last_text_date = max_text_date
@@ -253,35 +348,35 @@ def upload_kakao(
         db.commit()
         db.refresh(convo)
 
-    job = None
-    if max_text_date:
-        job = enqueue_analysis_job(
-            db=db,
-            conversation_id=convo.id,
-            upload_id=upload.id,
-            target_date=max_text_date,
-            webhook_url=webhook_url,
-            photo_flags=photo_flags,
-        )
-    analysis_result = process_job(db, job) if (sync_analysis and job) else None
+    learning_items = (
+        _load_learning_items(db, convo.id, analysis_result.analysis_date)
+        if analysis_result
+        else []
+    )
 
     return {
         "conversation_id": str(convo.id),
-        "upload_id": str(upload.id),
+        "upload_id": str(upload.id) if upload else None,
         "ingested_messages": len(new_messages),
         "skipped_messages": len(messages) - len(new_messages),
-        "analysis_job_id": str(job.id) if job else None,
-        "analysis_status": job.status.value if job else None,
-        "analysis_result": _serialize_analysis_result(analysis_result),
+        "analysis_jobs": analysis_jobs,
+        "analysis_job_id": analysis_jobs[0]["analysis_job_id"] if analysis_jobs else None,
+        "analysis_status": analysis_jobs[0]["analysis_status"] if analysis_jobs else None,
+        "upload_date": upload.upload_date.isoformat() if upload else None,
+        "analysis_result": _serialize_analysis_result(analysis_result, learning_items),
         "last_ingested_date": convo.last_ingested_date.isoformat()
         if convo.last_ingested_date
         else None,
     }
 
 
-def _serialize_analysis_result(result: AnalysisResult | None) -> dict[str, object | None] | None:
+def _serialize_analysis_result(
+    result: AnalysisResult | None,
+    learning_items: list[LearningContent] | None = None,
+) -> dict[str, object | None] | None:
     if result is None:
         return None
+    learning_payload = _serialize_learning_items(learning_items or [])
     return {
         "analysis_date": result.analysis_date.isoformat(),
         "summary_text": result.summary_text,
@@ -291,4 +386,37 @@ def _serialize_analysis_result(result: AnalysisResult | None) -> dict[str, objec
         "warning_tags": result.warning_tags_text.split(",") if result.warning_tags_text else [],
         "risk_explanation_text": result.risk_explanation_text,
         "risk_level": result.risk_level,
+        "learning_items": learning_payload,
     }
+
+
+def _serialize_learning_items(
+    items: list[LearningContent],
+) -> list[dict[str, str | None]]:
+    return [
+        {
+            "content": item.content,
+            "content_type": item.content_type.value,
+            "review_due_date": item.review_due_date.isoformat()
+            if item.review_due_date
+            else None,
+        }
+        for item in items
+    ]
+
+
+def _load_learning_items(
+    db: Session,
+    conversation_id: uuid.UUID,
+    target_date: date,
+) -> list[LearningContent]:
+    return (
+        db.execute(
+            select(LearningContent).where(
+                LearningContent.conversation_id == conversation_id,
+                func.date(LearningContent.created_at) == target_date,
+            )
+        )
+        .scalars()
+        .all()
+    )

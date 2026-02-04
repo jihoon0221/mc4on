@@ -29,6 +29,8 @@ export async function fetchTimelineEntries(): Promise<TimelineEntry[]> {
     date: item.entry_date,
     summary: item.summary_short ?? item.warning_text ?? '오늘의 기록',
     tags: item.tags,
+    warningText: item.warning_text,
+    warningTags: item.warning_tags,
     birdState: mapBirdStateFromRisk(item.bird_state),
     createdAt: new Date().toISOString(),
   }));

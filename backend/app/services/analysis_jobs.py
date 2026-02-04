@@ -20,6 +20,7 @@ from app.models.models import (
     RiskEvent,
     User,
 )
+from app.core.crypto import decrypt_text
 from app.services.analysis import run_daily_analysis
 from app.services.external_checks import check_account, check_link
 from app.services.risk import bird_state_from_risk_level
@@ -89,7 +90,16 @@ def process_job(db: Session, job: AnalysisJob) -> AnalysisResult | None:
         messages = db.execute(
             select(Message).where(Message.upload_id == job.upload_id)
         ).scalars().all()
-        message_texts = [m.content_masked or "" for m in messages if m.content_masked]
+        message_texts: list[str] = []
+        for msg in messages:
+            if msg.content_masked:
+                message_texts.append(msg.content_masked)
+                continue
+            if msg.content_encrypted:
+                try:
+                    message_texts.append(decrypt_text(msg.content_encrypted))
+                except Exception:
+                    continue
         if not message_texts:
             message_texts = ["(텍스트 없음)"]
 
