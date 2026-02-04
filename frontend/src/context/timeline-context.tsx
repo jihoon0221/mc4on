@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 import type { TimelineEntry } from '@/src/models/timeline-entry';
+import { completeTimelineEntry, fetchTimelineEntries } from '@/src/api/timeline';
 import { loadTimelineEntries, saveTimelineEntries } from '@/src/storage/timeline-storage';
 
 type TimelineContextValue = {
@@ -18,8 +19,14 @@ export function TimelineProvider({ children }: { children: React.ReactNode }) {
 
   const reload = useCallback(async () => {
     setIsLoading(true);
-    const loaded = await loadTimelineEntries();
-    setEntries(loaded);
+    try {
+      const loaded = await fetchTimelineEntries();
+      setEntries(loaded);
+      await saveTimelineEntries(loaded);
+    } catch {
+      const cached = await loadTimelineEntries();
+      setEntries(cached);
+    }
     setIsLoading(false);
   }, []);
 
@@ -31,7 +38,12 @@ export function TimelineProvider({ children }: { children: React.ReactNode }) {
     async (entry: TimelineEntry) => {
       const updated = [entry, ...entries.filter((item) => item.id !== entry.id)];
       setEntries(updated);
-      await saveTimelineEntries(updated);
+      try {
+        await completeTimelineEntry(entry);
+        await saveTimelineEntries(updated);
+      } catch {
+        await saveTimelineEntries(updated);
+      }
     },
     [entries]
   );

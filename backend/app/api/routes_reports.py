@@ -58,6 +58,7 @@ def daily_report(
     return {
         "report_date": result.analysis_date.isoformat(),
         "summary_text": result.summary_text,
+        "summary_tags": result.tags_text.split(",") if result.tags_text else [],
         "warning_text": result.warning_text,
         "learning_contents": [
             {
@@ -112,6 +113,7 @@ def _build_history_items(db: Session, results: list[AnalysisResult]) -> list[dic
                 "date": r.analysis_date.isoformat(),
                 "summary": {
                     "text": r.summary_text,
+                    "tags": r.tags_text.split(",") if r.tags_text else [],
                     "warning": {
                         "text": r.warning_text,
                         "tags": r.tags_text.split(",") if r.tags_text else [],
