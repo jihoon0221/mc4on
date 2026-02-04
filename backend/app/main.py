@@ -11,6 +11,7 @@ from app.api.routes_reports import router as reports_router
 from app.api.routes_report_requests import router as report_requests_router
 from app.api.routes_timeline import router as timeline_router
 from app.api.routes_upload import router as upload_router
+from app.api.routes_dev import router as dev_router
 
 app = FastAPI(title=settings.app_name)
 app.add_middleware(
@@ -39,3 +40,4 @@ app.include_router(learning_router)
 app.include_router(profile_router)
 app.include_router(analysis_jobs_router)
 app.include_router(timeline_router)
+app.include_router(dev_router)

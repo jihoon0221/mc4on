@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+import json
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
@@ -78,7 +79,7 @@ def history_reports(
     limit: int = 30,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-) -> dict[str, list[dict[str, str | None]]]:
+) -> dict[str, list[dict[str, object]]]:
     convo = _get_active_conversation(db, current_user.id)
     if convo is None:
         raise HTTPException(
@@ -93,40 +94,54 @@ def history_reports(
         .limit(limit)
     ).scalars().all()
 
-    return {
-        "items": _build_history_items(db, results),
-    }
+    return {"items": _build_history_items(db, results)}
 
 
-def _build_history_items(db: Session, results: list[AnalysisResult]) -> list[dict[str, str | None]]:
-    items: list[dict[str, str | None]] = []
+def _build_history_items(db: Session, results: list[AnalysisResult]) -> list[dict[str, object]]:
+    items: list[dict[str, object]] = []
     for r in results:
-        has_events = (
-            db.execute(
-                select(RiskEvent.id).where(RiskEvent.analysis_id == r.id).limit(1)
-            ).scalar_one_or_none()
-            is not None
-        )
+        learning_items = db.execute(
+            select(LearningContent)
+            .where(LearningContent.conversation_id == r.conversation_id)
+            .where(func.date(LearningContent.created_at) == r.analysis_date)
+            .order_by(LearningContent.created_at.desc())
+        ).scalars().all()
         items.append(
             {
-                "analysis_id": str(r.id),
-                "date": r.analysis_date.isoformat(),
-                "summary": {
-                    "text": r.summary_text,
-                    "tags": r.tags_text.split(",") if r.tags_text else [],
-                    "warning": {
-                        "text": r.warning_text,
-                        "tags": r.tags_text.split(",") if r.tags_text else [],
-                        "explanation_text": r.risk_explanation_text,
-                    }
-                    if has_events
-                    else None,
-                },
-                "summary_short": r.summary_short_text,
-                "should_prompt_report": bool(r.warning_text),
-                "bird_state": bird_state_from_risk_level(r.risk_level or 1)
-                if has_events
-                else None,
+                "analysis_date": r.analysis_date.isoformat(),
+                "summary_text": r.summary_text,
+                "tags": r.tags_text.split(",") if r.tags_text else [],
+                "warning_text": r.warning_text,
+                "warning_tags": r.warning_tags_text.split(",") if r.warning_tags_text else [],
+                "risk_level": r.risk_level,
+                "learning_items": _serialize_learning_items(learning_items),
             }
         )
     return items
+
+
+def _serialize_learning_items(items: list[LearningContent]) -> list[dict[str, str | None]]:
+    payloads: list[dict[str, str | None]] = []
+    for item in items:
+        content_kr = None
+        content_fl = None
+        raw = (item.content or "").strip()
+        if raw.startswith("{") and raw.endswith("}"):
+            try:
+                decoded = json.loads(raw)
+                content_kr = decoded.get("content_kr")
+                content_fl = decoded.get("content_fl")
+            except Exception:
+                content_kr = None
+                content_fl = None
+        if not content_kr:
+            content_kr = item.content
+        if not content_fl:
+            content_fl = content_kr
+        payloads.append(
+            {
+                "content_kr": content_kr,
+                "content_fl": content_fl,
+            }
+        )
+    return payloads
