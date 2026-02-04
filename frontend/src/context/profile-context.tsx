@@ -1,7 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 import type { Profile } from '@/src/models/profile';
-import { fetchProfile, updateProfile as updateProfileApi } from '@/src/api/profile';
 import { loadProfile, saveProfile } from '@/src/storage/profile-storage';
 
 type ProfileContextValue = {
@@ -19,16 +18,8 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
 
   const reload = useCallback(async () => {
     setIsLoading(true);
-    try {
-      const loaded = await fetchProfile();
-      const cached = await loadProfile();
-      const merged = { ...loaded, photoUri: cached?.photoUri ?? loaded.photoUri };
-      setProfile(merged);
-      await saveProfile(merged);
-    } catch {
-      const cached = await loadProfile();
-      setProfile(cached);
-    }
+    const loaded = await loadProfile();
+    setProfile(loaded);
     setIsLoading(false);
   }, []);
 
@@ -38,13 +29,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
 
   const updateProfile = useCallback(async (next: Profile) => {
     setProfile(next);
-    try {
-      const updated = await updateProfileApi(next);
-      setProfile(updated);
-      await saveProfile(updated);
-    } catch {
-      await saveProfile(next);
-    }
+    await saveProfile(next);
   }, []);
 
   const value = useMemo(

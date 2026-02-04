@@ -1,134 +1,72 @@
-﻿import * as ImagePicker from 'expo-image-picker';
-import React, { useEffect, useState } from 'react';
-import { Image, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+﻿import React, { useState } from 'react';
+import { Image, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { useProfile } from '@/src/context/profile-context';
 import TopBar from '@/src/components/TopBar';
-import type { Profile } from '@/src/models/profile';
-
-const emptyProfile: Profile = {
-  nickname: '',
-  partnerName: '',
-  partnerCountry: '',
-  partnerJob: '',
-  language: 'ko',
-  photoUri: undefined,
-};
+import SettingsMenu from '@/src/components/SettingsMenu';
+import { useProfile } from '@/src/context/profile-context';
 
 export default function ProfileScreen() {
-  const { profile, updateProfile } = useProfile();
-  const [draft, setDraft] = useState<Profile>(emptyProfile);
+  const { profile } = useProfile();
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
-  useEffect(() => {
-    if (profile) {
-      setDraft(profile);
-    }
-  }, [profile]);
-
-  const updateField = (key: keyof Profile, value: string) => {
-    setDraft((prev) => ({ ...prev, [key]: value }));
-  };
-
-  const handleSave = async () => {
-    await updateProfile(draft);
-  };
-
-  const pickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.9,
-      allowsEditing: true,
-      aspect: [1, 1],
-    });
-    if (!result.canceled && result.assets[0]?.uri) {
-      setDraft((prev) => ({ ...prev, photoUri: result.assets[0].uri }));
-    }
-  };
+  const hasProfile = Boolean(
+    profile && (profile.name || profile.age || profile.job || profile.country || profile.nativeLanguage || profile.howWeMet || profile.photoUri)
+  );
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-        <TopBar />
+        <TopBar onPressSettings={() => setSettingsOpen(true)} />
 
         <Text style={styles.title}>프로필</Text>
         <Text style={styles.subtitle}>상대의 정보를 차분히 기록해두세요.</Text>
 
-        <View style={styles.photoRow}>
-          <View style={styles.photoCircle}>
-            {draft.photoUri ? (
-              <Image source={{ uri: draft.photoUri }} style={styles.photoImage} />
-            ) : (
-              <Text style={styles.photoPlaceholder}>사진 없음</Text>
-            )}
+        <View style={styles.card}>
+          <View style={styles.photoRow}>
+            <View style={styles.photoCircle}>
+              {profile?.photoUri ? (
+                <Image source={{ uri: profile.photoUri }} style={styles.photoImage} />
+              ) : (
+                <Text style={styles.photoPlaceholder}>사진 없음</Text>
+              )}
+            </View>
+            <View style={styles.infoColumn}>
+              <Text style={styles.infoLabel}>이름</Text>
+              <Text style={styles.infoValue}>{profile?.name || '—'}</Text>
+
+              <Text style={styles.infoLabel}>나이</Text>
+              <Text style={styles.infoValue}>{profile?.age || '—'}</Text>
+
+              <Text style={styles.infoLabel}>직업</Text>
+              <Text style={styles.infoValue}>{profile?.job || '—'}</Text>
+            </View>
           </View>
-          <Pressable style={styles.photoButton} onPress={() => void pickImage()}>
-            <Text style={styles.photoButtonText}>사진 선택</Text>
-          </Pressable>
+
+          <View style={styles.infoRow}>
+            <View style={styles.infoBlock}>
+              <Text style={styles.infoLabel}>국가</Text>
+              <Text style={styles.infoValue}>{profile?.country || '—'}</Text>
+            </View>
+            <View style={styles.infoBlock}>
+              <Text style={styles.infoLabel}>모국어</Text>
+              <Text style={styles.infoValue}>{profile?.nativeLanguage || '—'}</Text>
+            </View>
+          </View>
+
+          <View style={styles.infoBlock}>
+            <Text style={styles.infoLabel}>어떻게 만났나요?</Text>
+            <Text style={styles.infoValue}>{profile?.howWeMet || '—'}</Text>
+          </View>
         </View>
 
-        <View style={styles.fieldGroup}>
-          <Text style={styles.label}>내 이름</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="예: 민지"
-            placeholderTextColor="#b1a39a"
-            value={draft.nickname}
-            onChangeText={(value) => updateField('nickname', value)}
-          />
-        </View>
-
-        <View style={styles.fieldGroup}>
-          <Text style={styles.label}>상대 이름</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="예: Alex"
-            placeholderTextColor="#b1a39a"
-            value={draft.partnerName}
-            onChangeText={(value) => updateField('partnerName', value)}
-          />
-        </View>
-
-        <View style={styles.fieldGroup}>
-          <Text style={styles.label}>상대 국가</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="예: 캐나다"
-            placeholderTextColor="#b1a39a"
-            value={draft.partnerCountry}
-            onChangeText={(value) => updateField('partnerCountry', value)}
-          />
-        </View>
-
-        <View style={styles.fieldGroup}>
-          <Text style={styles.label}>상대 직업</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="예: 디자이너"
-            placeholderTextColor="#b1a39a"
-            value={draft.partnerJob}
-            onChangeText={(value) => updateField('partnerJob', value)}
-          />
-        </View>
-
-        <View style={styles.fieldGroup}>
-          <Text style={styles.label}>선호 언어</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="예: 한국어"
-            placeholderTextColor="#b1a39a"
-            value={draft.language}
-            onChangeText={(value) => updateField('language', value)}
-          />
-        </View>
-
-        <Pressable style={styles.saveButton} onPress={() => void handleSave()}>
-          <Text style={styles.saveText}>저장</Text>
-        </Pressable>
-
-        <Pressable style={styles.reportButton} onPress={() => {}}>
-          <Text style={styles.reportText}>신고</Text>
-        </Pressable>
+        {!hasProfile ? (
+          <Text style={styles.emptyText}>설정에서 상대 정보 수정을 선택해 기록을 시작해보세요.</Text>
+        ) : (
+          <Text style={styles.hintText}>수정은 설정에서 상대 정보 수정으로 진행돼요.</Text>
+        )}
       </ScrollView>
+
+      <SettingsMenu visible={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </SafeAreaView>
   );
 }
@@ -142,27 +80,6 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 14,
   },
-  topBar: {
-    height: 42,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-  },
-  topSpacer: {
-    flex: 1,
-  },
-  iconRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  iconButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.35)',
-  },
   title: {
     fontSize: 28,
     fontWeight: '700',
@@ -171,6 +88,12 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 14,
     color: '#807167',
+  },
+  card: {
+    borderRadius: 22,
+    backgroundColor: '#f7eeea',
+    padding: 16,
+    gap: 12,
   },
   photoRow: {
     flexDirection: 'row',
@@ -181,7 +104,7 @@ const styles = StyleSheet.create({
     width: 86,
     height: 86,
     borderRadius: 43,
-    backgroundColor: '#f7eeea',
+    backgroundColor: 'rgba(255, 255, 255, 0.6)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -194,56 +117,32 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#9a8a7d',
   },
-  photoButton: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+  infoColumn: {
+    flex: 1,
+    gap: 4,
   },
-  photoButtonText: {
-    fontSize: 13,
-    color: '#6f6258',
+  infoRow: {
+    flexDirection: 'row',
+    gap: 12,
   },
-  fieldGroup: {
-    gap: 6,
+  infoBlock: {
+    flex: 1,
+    gap: 4,
   },
-  label: {
-    fontSize: 13,
-    color: '#7b6c62',
+  infoLabel: {
+    fontSize: 12,
+    color: '#9b8b80',
   },
-  input: {
-    borderRadius: 14,
-    backgroundColor: '#f7eeea',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    color: '#5c4e44',
-  },
-  inputMultiline: {
-    height: 80,
-    textAlignVertical: 'top',
-  },
-  saveButton: {
-    height: 50,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(232, 202, 191, 0.9)',
-  },
-  saveText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#5d4e45',
-  },
-  reportButton: {
-    height: 48,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-  },
-  reportText: {
+  infoValue: {
     fontSize: 14,
     color: '#5d4e45',
+  },
+  emptyText: {
+    fontSize: 12,
+    color: '#9a8a7d',
+  },
+  hintText: {
+    fontSize: 12,
+    color: '#8b7a6f',
   },
 });
