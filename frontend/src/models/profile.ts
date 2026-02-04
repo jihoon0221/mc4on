@@ -1,8 +1,8 @@
 export type Profile = {
-  age: string;
-  job: string;
-  country: string;
-  nativeLanguage: string;
-  howWeMet: string;
+  nickname: string;
+  partnerName: string;
+  partnerCountry: string;
+  partnerJob: string;
+  language: string;
   photoUri?: string;
 };

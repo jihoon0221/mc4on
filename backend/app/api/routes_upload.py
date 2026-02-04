@@ -10,9 +10,9 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user
 from app.core.crypto import encrypt_text
 from app.db.deps import get_db
-from app.models.models import Conversation, DetectedEntity, Message, MessageTypeEnum
+from app.models.models import AnalysisResult, Conversation, DetectedEntity, Message, MessageTypeEnum
 from app.models.models import SenderEnum, Upload, User
-from app.services.analysis_jobs import enqueue_analysis_job
+from app.services.analysis_jobs import enqueue_analysis_job, process_job
 from app.services.kakao_import import (
     dedupe_messages,
     extract_photo_date,
@@ -55,10 +55,11 @@ def upload(
     upload_date: date | None = Form(None),
     sender: SenderEnum = Form(SenderEnum.me),
     webhook_url: str | None = Form(None),
+    sync_analysis: bool = Form(False),
     file: UploadFile | None = File(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-) -> dict[str, str]:
+) -> dict[str, object]:
     convo = _get_or_create_conversation(db, current_user.id)
 
     raw_file_path = None
@@ -112,11 +113,13 @@ def upload(
         photo_flags=[],
     )
 
+    analysis_result = process_job(db, job) if sync_analysis else None
     return {
         "upload_id": str(upload.id),
         "conversation_id": str(convo.id),
         "analysis_job_id": str(job.id),
         "analysis_status": job.status.value,
+        "analysis_result": _serialize_analysis_result(analysis_result),
     }
 
 
@@ -143,6 +146,7 @@ def upload_kakao(
     chat_file: UploadFile = File(...),
     me_name: str | None = Form(None),
     webhook_url: str | None = Form(None),
+    sync_analysis: bool = Form(False),
     photos: list[UploadFile] | None = File(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -187,6 +191,9 @@ def upload_kakao(
             "conversation_id": str(convo.id),
             "ingested_messages": 0,
             "skipped_messages": len(messages),
+            "analysis_job_id": None,
+            "analysis_status": None,
+            "analysis_result": None,
             "last_ingested_date": convo.last_ingested_date.isoformat()
             if convo.last_ingested_date
             else None,
@@ -256,6 +263,7 @@ def upload_kakao(
             webhook_url=webhook_url,
             photo_flags=photo_flags,
         )
+    analysis_result = process_job(db, job) if (sync_analysis and job) else None
 
     return {
         "conversation_id": str(convo.id),
@@ -264,7 +272,23 @@ def upload_kakao(
         "skipped_messages": len(messages) - len(new_messages),
         "analysis_job_id": str(job.id) if job else None,
         "analysis_status": job.status.value if job else None,
+        "analysis_result": _serialize_analysis_result(analysis_result),
         "last_ingested_date": convo.last_ingested_date.isoformat()
         if convo.last_ingested_date
         else None,
+    }
+
+
+def _serialize_analysis_result(result: AnalysisResult | None) -> dict[str, object | None] | None:
+    if result is None:
+        return None
+    return {
+        "analysis_date": result.analysis_date.isoformat(),
+        "summary_text": result.summary_text,
+        "summary_short": result.summary_short_text,
+        "tags": result.tags_text.split(",") if result.tags_text else [],
+        "warning_text": result.warning_text,
+        "warning_tags": result.warning_tags_text.split(",") if result.warning_tags_text else [],
+        "risk_explanation_text": result.risk_explanation_text,
+        "risk_level": result.risk_level,
     }

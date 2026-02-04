@@ -7,6 +7,7 @@ import TopBar from '@/src/components/TopBar';
 import JourneyHeader from '@/src/components/JourneyHeader';
 import TimelineCard, { type TimelineCardItem } from '@/src/components/TimelineCard';
 import { useDayRecords } from '@/src/context/day-records-context';
+import { useTimeline } from '@/src/context/timeline-context';
 import type { BirdState as ModelBirdState } from '@/src/models/bird-state';
 import type { BirdState as VisualBirdState } from '@/src/components/BirdCharacter';
 import { getSeoulDateKey } from '@/src/utils/date';
@@ -118,6 +119,18 @@ function buildTitleSubtitle(flags: ReturnType<typeof useDayRecords>['records'][0
   };
 }
 
+function normalizeTags(tags: string[]) {
+  if (tags.length === 0) return ['#일상대화'];
+  return tags.map((tag) => (tag.startsWith('#') ? tag : `#${tag}`));
+}
+
+function buildSummarySubtitle(tags: string[]) {
+  if (tags.length === 0) {
+    return '오늘의 기록을 정리했어요.';
+  }
+  return tags.slice(0, 3).join(' · ');
+}
+
 function deriveStage(tags: string[], totalCount: number) {
   if (tags.some((tag) => STAGE_TAGS.stage3.includes(tag))) return 3;
   if (tags.some((tag) => STAGE_TAGS.stage2.includes(tag))) return 2;
@@ -140,6 +153,7 @@ const WARNING_MESSAGE = '이 기록은 잠시 멈춰 다시 살펴볼 만한 부
 export default function TimelineScreen() {
   const router = useRouter();
   const { records, markImmediateRiskShown } = useDayRecords();
+  const { entries: timelineEntries } = useTimeline();
   const [filter, setFilter] = useState<FilterKey>('all');
   const [riskTargetId, setRiskTargetId] = useState<string | null>(null);
   const [warningTarget, setWarningTarget] = useState<TimelineCardItem | null>(null);
@@ -151,6 +165,24 @@ export default function TimelineScreen() {
   );
 
   const items = useMemo(() => {
+    if (timelineEntries.length > 0) {
+      return timelineEntries.map((entry, index) => {
+        const tags = normalizeTags(entry.tags);
+        const isToday = entry.date === todayKey;
+        const groupLabel = isToday ? '오늘' : `Day ${index + 1}`;
+
+        return {
+          id: entry.id,
+          groupLabel,
+          dateLabel: formatMonthDay(entry.date),
+          title: entry.summary,
+          subtitle: buildSummarySubtitle(tags),
+          tags,
+          status: 'learned',
+          birdState: mapBirdState(entry.birdState),
+        } satisfies TimelineCardItem;
+      });
+    }
     if (sortedRecords.length === 0) return MOCK_ITEMS;
     return sortedRecords.map((record, index) => {
       const tags = buildTagsFromFlags(record.flags);
@@ -170,7 +202,7 @@ export default function TimelineScreen() {
         __flags: record.flags,
       } as TimelineCardItem & { __flags: typeof record.flags };
     });
-  }, [sortedRecords, todayKey]);
+  }, [sortedRecords, todayKey, timelineEntries]);
 
   const filtered = useMemo(() => {
     if (filter === 'all') return items;
@@ -410,5 +442,3 @@ const styles = StyleSheet.create({
     color: '#7b6c62',
   },
 });
-
-

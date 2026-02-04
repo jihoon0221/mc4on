@@ -7,11 +7,11 @@ import TopBar from '@/src/components/TopBar';
 import type { Profile } from '@/src/models/profile';
 
 const emptyProfile: Profile = {
-  age: '',
-  job: '',
-  country: '',
-  nativeLanguage: '',
-  howWeMet: '',
+  nickname: '',
+  partnerName: '',
+  partnerCountry: '',
+  partnerJob: '',
+  language: 'ko',
   photoUri: undefined,
 };
 
@@ -67,58 +67,57 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.fieldGroup}>
-          <Text style={styles.label}>나이</Text>
+          <Text style={styles.label}>내 이름</Text>
           <TextInput
             style={styles.input}
-            placeholder="예: 29"
+            placeholder="예: 민지"
             placeholderTextColor="#b1a39a"
-            value={draft.age}
-            onChangeText={(value) => updateField('age', value)}
+            value={draft.nickname}
+            onChangeText={(value) => updateField('nickname', value)}
           />
         </View>
 
         <View style={styles.fieldGroup}>
-          <Text style={styles.label}>직업</Text>
+          <Text style={styles.label}>상대 이름</Text>
           <TextInput
             style={styles.input}
-            placeholder="예: 디자이너"
+            placeholder="예: Alex"
             placeholderTextColor="#b1a39a"
-            value={draft.job}
-            onChangeText={(value) => updateField('job', value)}
+            value={draft.partnerName}
+            onChangeText={(value) => updateField('partnerName', value)}
           />
         </View>
 
         <View style={styles.fieldGroup}>
-          <Text style={styles.label}>국가</Text>
+          <Text style={styles.label}>상대 국가</Text>
           <TextInput
             style={styles.input}
             placeholder="예: 캐나다"
             placeholderTextColor="#b1a39a"
-            value={draft.country}
-            onChangeText={(value) => updateField('country', value)}
+            value={draft.partnerCountry}
+            onChangeText={(value) => updateField('partnerCountry', value)}
           />
         </View>
 
         <View style={styles.fieldGroup}>
-          <Text style={styles.label}>모국어</Text>
+          <Text style={styles.label}>상대 직업</Text>
           <TextInput
             style={styles.input}
-            placeholder="예: 영어"
+            placeholder="예: 디자이너"
             placeholderTextColor="#b1a39a"
-            value={draft.nativeLanguage}
-            onChangeText={(value) => updateField('nativeLanguage', value)}
+            value={draft.partnerJob}
+            onChangeText={(value) => updateField('partnerJob', value)}
           />
         </View>
 
         <View style={styles.fieldGroup}>
-          <Text style={styles.label}>어떻게 만났나요?</Text>
+          <Text style={styles.label}>선호 언어</Text>
           <TextInput
-            style={[styles.input, styles.inputMultiline]}
-            placeholder="예: 여행 중 커뮤니티, 지인 소개"
+            style={styles.input}
+            placeholder="예: 한국어"
             placeholderTextColor="#b1a39a"
-            value={draft.howWeMet}
-            onChangeText={(value) => updateField('howWeMet', value)}
-            multiline
+            value={draft.language}
+            onChangeText={(value) => updateField('language', value)}
           />
         </View>
 
@@ -248,5 +247,3 @@ const styles = StyleSheet.create({
     color: '#5d4e45',
   },
 });
-
-
