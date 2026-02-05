@@ -1,0 +1,226 @@
+{
+  "timeline": [
+    {
+      "analysis_date": "2026-01-10",
+      "summary_short": "기한 마감과 입금 확인을 요청하며 심리적 압박을 줬어요.",
+      "tags": ["마감", "입금확인", "압박", "불안", "재촉"],
+      "warning_text": "주의가 필요한 흐름과 유사할 수 있어요. 시간 압박, 입금 확인 집착 흐름이 함께 나타났어요. 송금이나 선불 결제는 잠시 보류해 주세요.",
+      "warning_tags": ["시간 압박", "입금 확인 집착"],
+      "risk_level": 4,
+      "bird_state": 8
+    },
+    {
+      "analysis_date": "2026-01-09",
+      "summary_short": "빠른 송금 수단과 지갑 주소를 제시했어요.",
+      "tags": ["비트코인", "지갑주소", "송금수단", "빠른처리", "요청"],
+      "warning_text": "주의가 필요한 흐름과 유사할 수 있어요. 송금수단 지정/제안, 추적 회피 수단 흐름이 함께 나타났어요. 송금이나 선불 결제는 잠시 보류해 주세요.",
+      "warning_tags": ["송금수단 지정/제안", "추적 회피 수단"],
+      "risk_level": 4,
+      "bird_state": 7
+    },
+    {
+      "analysis_date": "2026-01-08",
+      "summary_short": "추가 비용과 긴급 처리를 강조했어요.",
+      "tags": ["추가비용", "긴급", "세관", "보관비", "압박"],
+      "warning_text": "주의가 필요한 흐름과 유사할 수 있어요. 금전 요청, 시간 압박 흐름이 함께 나타났어요. 송금이나 선불 결제는 잠시 보류해 주세요.",
+      "warning_tags": ["금전 요청", "시간 압박"],
+      "risk_level": 4,
+      "bird_state": 6
+    },
+    {
+      "analysis_date": "2026-01-07",
+      "summary_short": "금 보관과 통관 비용을 요청했어요.",
+      "tags": ["금", "보관", "통관비", "비용요청", "신뢰"],
+      "warning_text": "주의가 필요한 흐름과 유사할 수 있어요. 통관비/보관비/수수료 대납 요구, 금전 요청 흐름이 함께 나타났어요. 송금이나 선불 결제는 잠시 보류해 주세요.",
+      "warning_tags": ["통관비/보관비/수수료 대납 요구", "금전 요청"],
+      "risk_level": 4,
+      "bird_state": 5
+    },
+    {
+      "analysis_date": "2026-01-06",
+      "summary_short": "포상금 정산 수수료를 먼저 내달라고 했어요.",
+      "tags": ["포상금", "정산", "수수료", "선납", "요청"],
+      "warning_text": "주의가 필요한 흐름과 유사할 수 있어요. 금전 요청 흐름이 함께 나타났어요. 송금이나 선불 결제는 잠시 보류해 주세요.",
+      "warning_tags": ["금전 요청"],
+      "risk_level": 3,
+      "bird_state": 4
+    },
+    {
+      "analysis_date": "2026-01-05",
+      "summary_short": "만남을 이야기하며 일정과 결정을 서두르는 흐름이 있었어요.",
+      "tags": ["만남", "항공일정", "결정", "서두름", "미래"],
+      "warning_text": "확인해두면 좋은 흐름이 보여요. 시간 압박 흐름이 함께 나타났어요. 상대 정보를 천천히 확인해도 괜찮아요.",
+      "warning_tags": ["시간 압박"],
+      "risk_level": 2,
+      "bird_state": 3
+    },
+    {
+      "analysis_date": "2026-01-04",
+      "summary_short": "근무복 사진으로 신뢰를 쌓으려는 흐름이 있었어요.",
+      "tags": ["사진", "근무복", "신뢰", "안심", "진심"],
+      "warning_text": "확인해두면 좋은 흐름이 보여요. 사진/프로필 신뢰 구축 흐름이 함께 나타났어요.",
+      "warning_tags": ["사진/프로필 신뢰 구축"],
+      "risk_level": 2,
+      "bird_state": 2
+    },
+    {
+      "analysis_date": "2026-01-03",
+      "summary_short": "해외 파견과 채널 이동을 이야기했어요.",
+      "tags": ["파견", "해외", "시리아", "채널이동", "카카오톡"],
+      "warning_text": "주의가 필요한 흐름과 유사할 수 있어요. 해외 체류/파병 강조, 채널 이동 유도 흐름이 함께 나타났어요.",
+      "warning_tags": ["해외 체류/파병 강조", "채널 이동 유도"],
+      "risk_level": 3,
+      "bird_state": 1
+    },
+    {
+      "analysis_date": "2026-01-02",
+      "summary_short": "안부를 주고받으며 일상을 이야기했어요.",
+      "tags": ["안부", "근무", "일상", "대화", "응원"],
+      "warning_text": null,
+      "warning_tags": [],
+      "risk_level": 1,
+      "bird_state": 0
+    },
+    {
+      "analysis_date": "2026-01-01",
+      "summary_short": "처음 인사를 나누며 서로를 소개했어요.",
+      "tags": ["인사", "소개", "프로필", "페이스북", "대화"],
+      "warning_text": null,
+      "warning_tags": [],
+      "risk_level": 1,
+      "bird_state": 0
+    }
+  ],
+  "dailyreport": [
+    {
+      "analysis_date": "2026-01-01",
+      "summary_text": "페이스북에서 프로필을 보고 인사를 나누며 서로를 소개했어요. 말레이시아 군 의료 관련 일을 한다는 이야기와 첫 대화 분위기를 공유했어요.",
+      "tags": ["페이스북", "프로필", "소개", "말레이시아", "인사"],
+      "warning_text": null,
+      "warning_tags": [],
+      "risk_level": 1,
+      "learning_items": [
+        {"content_kr": "페이스북에서 우연히 프로필을 봤어요.", "content_fl": "I happened to see your profile on Facebook."},
+        {"content_kr": "저는 Daniel이에요.", "content_fl": "I'm Daniel."},
+        {"content_kr": "한국 분과 이야기해보는 건 처음이네요.", "content_fl": "It's my first time talking with someone from Korea."}
+      ]
+    },
+    {
+      "analysis_date": "2026-01-02",
+      "summary_text": "서로 안부를 묻고 하루 컨디션을 확인했어요. 근무가 길다는 이야기를 나누며 일상적인 대화를 이어갔어요.",
+      "tags": ["안부", "근무", "일상", "대화", "컨디션"],
+      "warning_text": null,
+      "warning_tags": [],
+      "risk_level": 1,
+      "learning_items": [
+        {"content_kr": "좋은 아침이에요.", "content_fl": "Good morning."},
+        {"content_kr": "어제는 편안히 쉬셨나요?", "content_fl": "Did you rest well yesterday?"},
+        {"content_kr": "저는 오늘 근무가 조금 길 것 같아요.", "content_fl": "I think my shift will be a bit long today."}
+      ]
+    },
+    {
+      "analysis_date": "2026-01-03",
+      "summary_text": "시리아 파견 일정과 위험한 근무지 이야기가 나왔어요. 페이스북 대신 카카오톡으로 채널 이동을 제안했어요.",
+      "tags": ["시리아", "파견", "해외", "채널이동", "카카오톡"],
+      "warning_text": "주의가 필요한 흐름과 유사할 수 있어요. 해외 체류/파병 강조, 채널 이동 유도 흐름이 함께 나타났어요.",
+      "warning_tags": ["해외 체류/파병 강조", "채널 이동 유도"],
+      "risk_level": 3,
+      "learning_items": [
+        {"content_kr": "근무지가 조금 위험한 곳이에요.", "content_fl": "My workplace is a bit dangerous."},
+        {"content_kr": "시리아 쪽 파견 일정이 있어서요.", "content_fl": "I have a deployment schedule to Syria."},
+        {"content_kr": "카카오톡으로 이야기해도 괜찮을까요?", "content_fl": "Would it be okay to talk on KakaoTalk?"}
+      ]
+    },
+    {
+      "analysis_date": "2026-01-04",
+      "summary_text": "근무복 사진을 보내며 신뢰를 쌓으려는 흐름이 있었어요. 상대가 불안해할까봐 진심을 강조했어요.",
+      "tags": ["사진", "근무복", "신뢰", "안심", "진심"],
+      "warning_text": "확인해두면 좋은 흐름이 보여요. 사진/프로필 신뢰 구축 흐름이 함께 나타났어요.",
+      "warning_tags": ["사진/프로필 신뢰 구축"],
+      "risk_level": 2,
+      "learning_items": [
+        {"content_kr": "근무복 사진 하나 보내요.", "content_fl": "I'll send you a photo in uniform."},
+        {"content_kr": "당신이 불안해할까봐요.", "content_fl": "I didn't want you to feel uneasy."},
+        {"content_kr": "저는 진심으로 이야기하고 싶어요.", "content_fl": "I want to talk sincerely."}
+      ]
+    },
+    {
+      "analysis_date": "2026-01-05",
+      "summary_text": "파견이 끝나면 만나고 싶다는 이야기가 나왔어요. 항공 일정 문제와 결정 압박이 함께 등장했어요.",
+      "tags": ["만남", "항공일정", "결정", "서두름", "미래"],
+      "warning_text": "확인해두면 좋은 흐름이 보여요. 시간 압박 흐름이 함께 나타났어요. 상대 정보를 천천히 확인해도 괜찮아요.",
+      "warning_tags": ["시간 압박"],
+      "risk_level": 2,
+      "learning_items": [
+        {"content_kr": "파견이 끝나면 한국에 가서 직접 만나면 어떨지.", "content_fl": "I wonder about meeting you in Korea after the deployment."},
+        {"content_kr": "오늘 안에 결정을 해야 한다고 해서요.", "content_fl": "They said I have to decide by today."},
+        {"content_kr": "부담 주려는 건 아니에요.", "content_fl": "I don't want to pressure you."}
+      ]
+    },
+    {
+      "analysis_date": "2026-01-06",
+      "summary_text": "포상금 정산을 위해 수수료를 먼저 내야 한다고 했어요. 직접 처리하기 어렵다는 이유로 도움을 요청했어요.",
+      "tags": ["포상금", "정산", "수수료", "요청", "곤란"],
+      "warning_text": "주의가 필요한 흐름과 유사할 수 있어요. 금전 요청 흐름이 함께 나타났어요. 송금이나 선불 결제는 잠시 보류해 주세요.",
+      "warning_tags": ["금전 요청"],
+      "risk_level": 3,
+      "learning_items": [
+        {"content_kr": "처리 수수료를 먼저 내야 진행된대요.", "content_fl": "They said I need to pay a processing fee first."},
+        {"content_kr": "직접 처리가 어려워서요.", "content_fl": "It's hard to handle it directly."},
+        {"content_kr": "큰 금액은 아니에요.", "content_fl": "It's not a large amount."}
+      ]
+    },
+    {
+      "analysis_date": "2026-01-07",
+      "summary_text": "포상금 일부가 금으로 보관돼 있다는 이야기가 나왔어요. 통관 비용을 이유로 지원을 요청했어요.",
+      "tags": ["금", "보관", "통관", "비용", "요청"],
+      "warning_text": "주의가 필요한 흐름과 유사할 수 있어요. 통관비/보관비/수수료 대납 요구, 금전 요청 흐름이 함께 나타났어요. 송금이나 선불 결제는 잠시 보류해 주세요.",
+      "warning_tags": ["통관비/보관비/수수료 대납 요구", "금전 요청"],
+      "risk_level": 4,
+      "learning_items": [
+        {"content_kr": "포상금 일부가 금 형태로 보관돼 있어요.", "content_fl": "Part of the reward is kept in gold."},
+        {"content_kr": "한국으로 보내서 잠시 보관해주면 좋겠다고 했어요.", "content_fl": "They asked if you could keep it temporarily in Korea."},
+        {"content_kr": "통관 절차 때문에 비용이 필요하대요.", "content_fl": "They said a fee is needed for customs clearance."}
+      ]
+    },
+    {
+      "analysis_date": "2026-01-08",
+      "summary_text": "세관 보관비가 추가로 필요하다고 했어요. 오늘 처리하지 않으면 문제가 커진다는 압박이 있었어요.",
+      "tags": ["세관", "보관비", "추가비용", "긴급", "압박"],
+      "warning_text": "주의가 필요한 흐름과 유사할 수 있어요. 금전 요청, 시간 압박 흐름이 함께 나타났어요. 송금이나 선불 결제는 잠시 보류해 주세요.",
+      "warning_tags": ["금전 요청", "시간 압박"],
+      "risk_level": 4,
+      "learning_items": [
+        {"content_kr": "보관비가 추가로 필요하대요.", "content_fl": "They said additional storage fees are needed."},
+        {"content_kr": "오늘 처리 안 하면 문제가 커질 수 있대요.", "content_fl": "They said it could get worse if it's not handled today."},
+        {"content_kr": "시간이 너무 없어요.", "content_fl": "There isn't much time."}
+      ]
+    },
+    {
+      "analysis_date": "2026-01-09",
+      "summary_text": "빠른 송금 수단으로 비트코인을 제안하고 지갑 주소를 보냈어요. 처리 지연에 대한 재촉이 있었어요.",
+      "tags": ["비트코인", "지갑", "송금", "재촉", "빠른처리"],
+      "warning_text": "주의가 필요한 흐름과 유사할 수 있어요. 송금수단 지정/제안, 추적 회피 수단 흐름이 함께 나타났어요. 송금이나 선불 결제는 잠시 보류해 주세요.",
+      "warning_tags": ["송금수단 지정/제안", "추적 회피 수단"],
+      "risk_level": 4,
+      "learning_items": [
+        {"content_kr": "비트코인으로 보내면 바로 처리된다고 하네요.", "content_fl": "They say it can be processed immediately if you send Bitcoin."},
+        {"content_kr": "지갑 주소를 보낼게요.", "content_fl": "I'll send the wallet address."},
+        {"content_kr": "아직 처리 안 된 거죠?", "content_fl": "It hasn't been processed yet, right?"}
+      ]
+    },
+    {
+      "analysis_date": "2026-01-10",
+      "summary_text": "마감 시간이 임박했다고 강조하며 입금 여부 확인을 재촉했어요. 감정 호소와 압박이 함께 나타났어요.",
+      "tags": ["마감", "입금확인", "재촉", "압박", "불안"],
+      "warning_text": "주의가 필요한 흐름과 유사할 수 있어요. 시간 압박, 입금 확인 집착 흐름이 함께 나타났어요. 송금이나 선불 결제는 잠시 보류해 주세요.",
+      "warning_tags": ["시간 압박", "입금 확인 집착"],
+      "risk_level": 4,
+      "learning_items": [
+        {"content_kr": "오늘 오후 3시가 마감이래요.", "content_fl": "They said the deadline is 3 PM today."},
+        {"content_kr": "지금 입금됐는지만 확인해줄 수 있어요?", "content_fl": "Can you just check whether the deposit went through?"},
+        {"content_kr": "네 아니오로만 답해줘요.", "content_fl": "Please answer only yes or no."}
+      ]
+    }
+  ]
+}

@@ -17,6 +17,9 @@ import {
 
 import { API_BASE_URL, apiFetch } from '@/src/api/client';
 import { uploadKakao, type KakaoUploadResponse } from '@/src/api/upload';
+import type { TimelineEntry } from '@/src/models/timeline-entry';
+import { saveTimelineEntries } from '@/src/storage/timeline-storage';
+import { fetchTimelineEntries } from '@/src/api/timeline';
 import BirdCharacter, { type BirdState } from '@/src/components/BirdCharacter';
 import Nest from '@/src/components/Nest';
 import SettingsMenu from '@/src/components/SettingsMenu';
@@ -114,6 +117,22 @@ function normalizeAnalysisResult(input: KakaoUploadResponse['analysis_result']):
       };
     }),
   };
+}
+
+function mapTimelineResponseToEntries(
+  items: NonNullable<KakaoUploadResponse['timeline']>
+): TimelineEntry[] {
+  return items.map((item) => ({
+    id: item.analysis_date,
+    date: item.analysis_date,
+    summary: item.summary_short ?? item.warning_text ?? '오늘의 기록',
+    tags: item.tags ?? [],
+    warningText: item.warning_text,
+    warningTags: item.warning_tags,
+    riskLevel: item.risk_level,
+    birdState: item.bird_state > 0 ? 'anxious' : 'calm',
+    createdAt: new Date().toISOString(),
+  }));
 }
 
 function normalizeHistoryItem(item: ReportHistoryItem): AnalysisResult {
@@ -466,6 +485,16 @@ export default function HomeScreen() {
           warningTextPreview: response.analysis_result?.warning_text?.slice(0, 120) ?? null,
         });
         analysisResult = normalizeAnalysisResult(response.analysis_result);
+
+        if (response.timeline && response.timeline.length > 0) {
+          const mapped = mapTimelineResponseToEntries(response.timeline);
+          await saveTimelineEntries(mapped);
+        } else {
+          const serverTimeline = await fetchTimelineEntries();
+          if (serverTimeline.length > 0) {
+            await saveTimelineEntries(serverTimeline);
+          }
+        }
 
         if (!analysisResult && jobId) {
           void (async () => {
@@ -917,6 +946,4 @@ const styles = StyleSheet.create({
     width: 78,
   },
 });
-
-
 

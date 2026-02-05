@@ -8,4 +8,7 @@ export type TimelineEntry = {
   birdState: BirdState;
   createdAt: string;
   sourceFileName?: string;
+  warningText?: string | null;
+  warningTags?: string[];
+  riskLevel?: number | null;
 };
