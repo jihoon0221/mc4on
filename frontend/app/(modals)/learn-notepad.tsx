@@ -1,5 +1,5 @@
 ﻿import { router } from 'expo-router';
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import LearnScreen from '@/src/screens/LearnScreen';
@@ -8,6 +8,7 @@ import { getSeoulDateKey } from '@/src/utils/date';
 
 export default function LearnNotepadModal() {
   const { records } = useDayRecords();
+  const [completeNonce, setCompleteNonce] = useState(0);
   const todayKey = useMemo(() => getSeoulDateKey(), []);
   const todayRecord = useMemo(
     () => records.find((record) => record.date === todayKey),
@@ -50,12 +51,17 @@ export default function LearnNotepadModal() {
       <View style={styles.notepad}>
         <View style={styles.notepadHeader}>
           <View style={styles.headerLine} />
-          <Pressable style={styles.closeButton} onPress={() => router.back()}>
-            <Text style={styles.closeText}>닫기</Text>
+          <Pressable style={styles.closeButton} onPress={() => setCompleteNonce((prev) => prev + 1)}>
+            <Text style={styles.closeText}>완료</Text>
           </Pressable>
         </View>
         <View style={styles.content}>
-          <LearnScreen closeOnComplete insightContent={insightContent} analysisResult={analysisResult} />
+          <LearnScreen
+            closeOnComplete
+            insightContent={insightContent}
+            analysisResult={analysisResult}
+            completeNonce={completeNonce}
+          />
         </View>
       </View>
     </View>

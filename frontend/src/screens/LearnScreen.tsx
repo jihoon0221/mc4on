@@ -1,11 +1,12 @@
 ﻿import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 
 import InlineToast from '@/src/components/InlineToast';
 import LearnCard from '@/src/components/LearnCard';
 import ProgressDots from '@/src/components/ProgressDots';
+import { apiFetch } from '@/src/api/client';
 import { useDayRecords } from '@/src/context/day-records-context';
 import { useTimeline } from '@/src/context/timeline-context';
 import type { AnalysisResult, LearningItem } from '@/src/models/analysis-result';
@@ -18,6 +19,26 @@ type LearnScreenProps = {
   closeOnComplete?: boolean;
   insightContent?: React.ReactNode;
   analysisResult?: AnalysisResult | null;
+  completeNonce?: number;
+};
+
+type ReportHistoryItem = {
+  analysis_date: string;
+  summary_text?: string | null;
+  tags?: string[] | null;
+  warning_text?: string | null;
+  warning_tags?: string[] | null;
+  risk_level?: number | null;
+  learning_items?: Array<{
+    content_kr?: string | null;
+    content_fl?: string | null;
+    content_type?: string | null;
+    review_due_date?: string | null;
+  }>;
+};
+
+type ReportHistoryResponse = {
+  items: ReportHistoryItem[];
 };
 
 function deriveBirdState(record: DayRecord): BirdState {
@@ -45,11 +66,34 @@ function buildTags(record: DayRecord): string[] {
   return tags;
 }
 
+function normalizeReportItem(item?: ReportHistoryItem | null): AnalysisResult | null {
+  if (!item?.analysis_date) return null;
+  const learningItems: LearningItem[] = (item.learning_items ?? [])
+    .map((entry) => ({
+      content_kr: entry.content_kr ?? '',
+      content_fl: entry.content_fl ?? '',
+      content_type: entry.content_type ?? 'sentence',
+      review_due_date: entry.review_due_date ?? null,
+    }))
+    .filter((entry) => entry.content_kr || entry.content_fl);
+
+  return {
+    analysis_date: item.analysis_date,
+    summary_text: item.summary_text ?? null,
+    tags: item.tags ?? [],
+    warning_text: item.warning_text ?? null,
+    warning_tags: item.warning_tags ?? [],
+    risk_level: item.risk_level ?? null,
+    learning_items: learningItems,
+  };
+}
+
 export default function LearnScreen({
   onCompleted,
   closeOnComplete = false,
   insightContent,
   analysisResult,
+  completeNonce,
 }: LearnScreenProps) {
   const router = useRouter();
   const { width } = useWindowDimensions();
@@ -63,10 +107,18 @@ export default function LearnScreen({
     [records, todayKey]
   );
   const analysis = (analysisResult ?? todayRecord?.analysisResult ?? null) as AnalysisResult | null;
+  const [analysisOverride, setAnalysisOverride] = useState<AnalysisResult | null>(null);
+  const activeAnalysis = analysisOverride ?? analysis;
   const showDebug = typeof __DEV__ !== 'undefined' && __DEV__;
-  const analysisDebug = analysis
-    ? `analysis: date=${analysis.analysis_date} summary=${analysis.summary_text ? 'y' : 'n'} items=${analysis.learning_items.length}`
+  const analysisDebug = activeAnalysis
+    ? `analysis: date=${activeAnalysis.analysis_date} summary=${activeAnalysis.summary_text ? 'y' : 'n'} items=${activeAnalysis.learning_items.length}${
+        analysisOverride ? ' (override)' : ''
+      }`
     : 'analysis: none';
+  const [debugOpen, setDebugOpen] = useState(false);
+  const [debugDate, setDebugDate] = useState('');
+  const [debugError, setDebugError] = useState('');
+  const [dayIndex, setDayIndex] = useState<number | null>(null);
 
   const demoSentences = [
     '오늘은 조금 천천히 이야기하고 싶어.',
@@ -79,7 +131,7 @@ export default function LearnScreen({
     'Could you send just one more photo?',
   ];
 
-  const learningItems: LearningItem[] = analysis?.learning_items ?? [];
+  const learningItems: LearningItem[] = activeAnalysis?.learning_items ?? [];
   const useDemo = learningItems.length === 0 && (!todayRecord || (todayRecord.nativeSentences?.length ?? 0) === 0);
   const sentences = useDemo
     ? demoSentences
@@ -109,6 +161,43 @@ export default function LearnScreen({
     scrollRef.current?.scrollTo({ x: 0, animated: false });
   }, [sentences.length]);
 
+  useEffect(() => {
+    if (!analysis?.analysis_date) return;
+    setDebugDate((prev) => (prev ? prev : analysis.analysis_date));
+  }, [analysis?.analysis_date]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!activeAnalysis?.analysis_date) {
+      setDayIndex(null);
+      return () => {
+        cancelled = true;
+      };
+    }
+    const currentDate = activeAnalysis.analysis_date;
+    const computeDayIndex = (firstDate: string, todayDate: string) => {
+      const start = new Date(`${firstDate}T00:00:00+09:00`);
+      const end = new Date(`${todayDate}T00:00:00+09:00`);
+      const diffDays = Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+      return Math.max(1, diffDays + 1);
+    };
+    (async () => {
+      try {
+        const history = await apiFetch<ReportHistoryResponse>('/reports/history?limit=120');
+        const firstDate = history.items.length
+          ? history.items[history.items.length - 1]?.analysis_date
+          : currentDate;
+        const nextDay = computeDayIndex(firstDate ?? currentDate, currentDate);
+        if (!cancelled) setDayIndex(nextDay);
+      } catch {
+        if (!cancelled) setDayIndex(1);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeAnalysis?.analysis_date]);
+
   const progressText = sentences.length > 0 ? `${currentIndex + 1}/${sentences.length}` : '';
   const canComplete = learned || (sentences.length > 0 && viewed.length >= sentences.length);
 
@@ -129,10 +218,17 @@ export default function LearnScreen({
   };
 
   const handleComplete = async () => {
+    if (!canComplete || learned) {
+      return;
+    }
     if (!todayRecord) {
       setCompleteMessage('오늘 학습을 마쳤어요.');
       if (closeOnComplete) {
-        router.back();
+        if (typeof router.canGoBack === 'function' ? router.canGoBack() : false) {
+          router.back();
+        } else {
+          router.replace('/(tabs)');
+        }
       }
       return;
     }
@@ -141,12 +237,12 @@ export default function LearnScreen({
     if (!updated) return;
     setCompleteMessage('오늘 학습을 마쳤어요.');
 
-    const summary = analysis?.summary_text ?? todayRecord.extractedSentences?.[0] ?? '오늘의 대화를 기록했어요.';
+    const summary = activeAnalysis?.summary_text ?? todayRecord.extractedSentences?.[0] ?? '오늘의 대화를 기록했어요.';
     await addEntry({
       id: todayKey,
       date: todayKey,
       summary,
-      tags: analysis?.tags ?? buildTags(todayRecord),
+      tags: activeAnalysis?.tags ?? buildTags(todayRecord),
       birdState,
       createdAt: new Date().toISOString(),
       sourceFileName: todayRecord.sourceFileName,
@@ -156,20 +252,94 @@ export default function LearnScreen({
       await onCompleted(updated);
     }
     if (closeOnComplete) {
-      router.back();
+      if (typeof router.canGoBack === 'function' ? router.canGoBack() : false) {
+        router.back();
+      } else {
+        router.replace('/(tabs)');
+      }
     }
   };
 
+  const handleDebugApply = async () => {
+    const normalized = debugDate.trim();
+    if (!normalized) {
+      setDebugError('날짜를 입력해 주세요.');
+      return;
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+      setDebugError('YYYY-MM-DD 형식으로 입력해 주세요.');
+      return;
+    }
+    setDebugError('');
+    try {
+      const history = await apiFetch<ReportHistoryResponse>('/reports/history?limit=120');
+      const found = history.items.find((item) => item.analysis_date === normalized);
+      const normalizedItem = normalizeReportItem(found);
+      if (!normalizedItem) {
+        setAnalysisOverride(null);
+        setDebugError('해당 날짜 분석 결과가 없어요.');
+        return;
+      }
+      setAnalysisOverride(normalizedItem);
+    } catch {
+      setDebugError('히스토리를 불러오지 못했어요.');
+    }
+  };
+
+  const handleDebugReset = () => {
+    setAnalysisOverride(null);
+    setDebugError('');
+    setDebugDate(analysis?.analysis_date ?? '');
+  };
+
+  useEffect(() => {
+    if (!completeNonce) return;
+    void handleComplete();
+  }, [completeNonce, handleComplete]);
+
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
+      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <Text style={styles.title}>오늘의 학습</Text>
+          <View style={styles.titleRow}>
+            <Text style={styles.title}>{dayIndex ? `Day ${dayIndex}` : 'Day —'}</Text>
+            {showDebug ? (
+              <Pressable style={styles.debugButton} onPress={() => setDebugOpen((prev) => !prev)}>
+                <Text style={styles.debugButtonText}>{debugOpen ? '디버그 닫기' : '디버그'}</Text>
+              </Pressable>
+            ) : null}
+          </View>
           <Text style={styles.subtitle}>
-            {analysis?.analysis_date ? formatDateLabel(analysis.analysis_date) : useDemo ? '오늘' : formatDateLabel(todayKey)}
+            {activeAnalysis?.analysis_date
+              ? formatDateLabel(activeAnalysis.analysis_date)
+              : useDemo
+                ? '오늘'
+                : formatDateLabel(todayKey)}
           </Text>
           <Text style={styles.helper}>상대의 말, 상대의 언어로 다시 말해봐요.</Text>
           {showDebug ? <Text style={styles.debugText}>{analysisDebug}</Text> : null}
+          {showDebug && debugOpen ? (
+            <View style={styles.debugPanel}>
+              <Text style={styles.debugLabel}>분석 날짜 (YYYY-MM-DD)</Text>
+              <View style={styles.debugInputRow}>
+                <TextInput
+                  style={styles.debugInput}
+                  value={debugDate}
+                  onChangeText={setDebugDate}
+                  placeholder="2026-02-05"
+                  placeholderTextColor="#b0a197"
+                  autoCapitalize="none"
+                />
+                <Pressable style={styles.debugApplyButton} onPress={() => void handleDebugApply()}>
+                  <Text style={styles.debugApplyText}>적용</Text>
+                </Pressable>
+                <Pressable style={styles.debugResetButton} onPress={handleDebugReset}>
+                  <Text style={styles.debugResetText}>원복</Text>
+                </Pressable>
+              </View>
+              {debugError ? <Text style={styles.debugError}>{debugError}</Text> : null}
+            </View>
+          ) : null}
         </View>
 
         <View style={styles.progressRow}>
@@ -208,55 +378,89 @@ export default function LearnScreen({
 
         <InlineToast message={toastMessage} visible={toastVisible} />
 
-        {analysis ? (
-          <View style={styles.insightWrap}>
-            <Text style={styles.insightTitle}>오늘의 분석</Text>
-            {analysis.summary_text ? (
-              <Text style={styles.insightBody}>{analysis.summary_text}</Text>
-            ) : (
-              <Text style={styles.insightBody}>오늘은 특별한 요약이 없어요.</Text>
-            )}
-            {analysis.tags?.length ? (
-              <View style={styles.tagRow}>
-                {analysis.tags.map((tag) => (
-                  <View key={tag} style={styles.tagChip}>
-                    <Text style={styles.tagText}>#{tag}</Text>
-                  </View>
-                ))}
+        {activeAnalysis ? (
+          <>
+            <View style={styles.analysisCard}>
+              <View style={styles.analysisHeader}>
+                <View style={styles.analysisBadge} />
+                <Text style={styles.analysisTitle}>오늘의 분석</Text>
               </View>
-            ) : null}
-            {analysis.warning_text ? (
-              <View style={styles.warningWrap}>
+              {activeAnalysis.summary_text ? (
+                <Text style={styles.analysisBody}>{activeAnalysis.summary_text}</Text>
+              ) : (
+                <Text style={styles.analysisBody}>오늘은 특별한 요약이 없어요.</Text>
+              )}
+              {activeAnalysis.tags?.length ? (
+                <View style={styles.tagRow}>
+                  {activeAnalysis.tags.map((tag) => (
+                    <View key={tag} style={styles.tagChip}>
+                      <Text style={styles.tagText}>#{tag}</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+            </View>
+
+            <View style={styles.warningCard}>
+              <View style={styles.warningHeader}>
                 <Text style={styles.warningTitle}>주의 메시지</Text>
-                <Text style={styles.warningBody}>{analysis.warning_text}</Text>
-                {analysis.warning_tags?.length ? (
-                  <View style={styles.tagRow}>
-                    {analysis.warning_tags.map((tag) => (
-                      <View key={tag} style={styles.warningChip}>
-                        <Text style={styles.warningText}>#{tag}</Text>
+                {activeAnalysis.warning_tags?.length ? (
+                  <View style={styles.warningTagRow}>
+                    {activeAnalysis.warning_tags.slice(0, 2).map((tag) => (
+                      <View key={tag} style={styles.warningTagChip}>
+                        <Text style={styles.warningTagText}>#{tag}</Text>
                       </View>
                     ))}
                   </View>
                 ) : null}
               </View>
-            ) : null}
-            {analysis.risk_level != null ? (
-              <Text style={styles.riskLevel}>위험도 {analysis.risk_level}</Text>
-            ) : null}
-          </View>
+              {activeAnalysis.warning_text ? (
+                <Text style={styles.warningBody}>{activeAnalysis.warning_text}</Text>
+              ) : (
+                <Text style={styles.warningBody}>주의할 만한 메시지가 감지되지 않았어요.</Text>
+              )}
+              <View style={styles.warningChat}>
+                <View style={styles.chatHeaderRow}>
+                  <View style={styles.chatLabelPill}>
+                    <Text style={styles.chatLabelText}>내 대화</Text>
+                  </View>
+                </View>
+                <View style={styles.chatBubbleGroup}>
+                  <View style={styles.chatBubbleLeft}>
+                    <Text style={styles.chatBubbleText}>
+                      정산 내용을 확인해주세요.{'\n'}골프{'\n'}
+                      {'\n'}-정산금액 : 120,000원{'\n'}-요청인원 : 6명{'\n'}-정산기한 : 2026.01.31.(토) 13:00까지
+                      {'\n'}
+                      {'\n'}20,000원을 송금해주세요.
+                    </Text>
+                    <View style={styles.chatTailLeft} />
+                  </View>
+                </View>
+
+                <View style={styles.chatDivider} />
+
+                <View style={styles.chatHeaderRow}>
+                  <View style={styles.chatLabelPillAlt}>
+                    <Text style={styles.chatLabelTextAlt}>유사 스캠 예시</Text>
+                  </View>
+                </View>
+                <View style={styles.chatBubbleGroup}>
+                  <View style={styles.chatBubbleLeft}>
+                    <Text style={styles.chatBubbleTextAlt}>
+                      급하게 통관비를 내야 해서 오늘 안으로 송금 가능할까?
+                    </Text>
+                    <View style={styles.chatTailLeft} />
+                  </View>
+                </View>
+              </View>
+            </View>
+          </>
         ) : insightContent ? (
-          <View style={styles.insightWrap}>{insightContent}</View>
+          <View style={styles.analysisCard}>{insightContent}</View>
         ) : null}
 
-        <Pressable
-          style={[styles.completeButton, (!canComplete || learned) && styles.completeButtonDisabled]}
-          onPress={() => void handleComplete()}
-          disabled={!canComplete || learned}>
-          <Text style={styles.completeText}>{learned ? '완료됨' : '오늘 학습 완료'}</Text>
-        </Pressable>
-
         {completeMessage ? <Text style={styles.completeMessage}>{completeMessage}</Text> : null}
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -267,7 +471,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8f0eb',
   },
   container: {
-    flex: 1,
     paddingHorizontal: 16,
     paddingTop: 12,
     paddingBottom: 18,
@@ -276,10 +479,29 @@ const styles = StyleSheet.create({
   header: {
     gap: 6,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
   title: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: '700',
     color: '#5f5147',
+  },
+  debugButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    borderWidth: 1,
+    borderColor: '#e1d6cf',
+  },
+  debugButtonText: {
+    fontSize: 11,
+    color: '#7b6c62',
+    fontWeight: '600',
   },
   subtitle: {
     fontSize: 14,
@@ -293,11 +515,70 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#a08f84',
   },
+  debugPanel: {
+    marginTop: 4,
+    padding: 10,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    borderWidth: 1,
+    borderColor: '#eadfd7',
+    gap: 8,
+  },
+  debugLabel: {
+    fontSize: 11,
+    color: '#7b6c62',
+  },
+  debugInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  debugInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#e1d6cf',
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    fontSize: 12,
+    color: '#5f5147',
+  },
+  debugApplyButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: '#d9c8be',
+  },
+  debugApplyText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#5f5147',
+  },
+  debugResetButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: 'rgba(123, 108, 98, 0.12)',
+  },
+  debugResetText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#7b6c62',
+  },
+  debugError: {
+    fontSize: 11,
+    color: '#b5483f',
+  },
   progressRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 4,
+    marginTop: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.6)',
   },
   progressText: {
     fontSize: 13,
@@ -313,38 +594,40 @@ const styles = StyleSheet.create({
   cardWrap: {
     paddingHorizontal: 0,
   },
-  completeButton: {
-    height: 52,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(232, 202, 191, 0.9)',
-    marginTop: 6,
-  },
-  completeButtonDisabled: {
-    opacity: 0.6,
-  },
-  completeText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#5d4e45',
-  },
   completeMessage: {
     fontSize: 13,
     color: '#7b6c62',
   },
-  insightWrap: {
-    borderRadius: 16,
-    backgroundColor: '#f7eeea',
-    padding: 12,
+  analysisCard: {
+    borderRadius: 20,
+    backgroundColor: '#fff3ec',
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#f0d9cf',
+    gap: 8,
+    shadowColor: '#7b6c62',
+    shadowOpacity: 0.08,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 10,
+    elevation: 2,
   },
-  insightTitle: {
+  analysisHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  analysisBadge: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#e8b7a4',
+  },
+  analysisTitle: {
     fontSize: 13,
     fontWeight: '600',
     color: '#6e5f54',
-    marginBottom: 6,
   },
-  insightBody: {
+  analysisBody: {
     fontSize: 12,
     color: '#7b6c62',
     lineHeight: 18,
@@ -353,49 +636,145 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 6,
-    marginTop: 8,
+    marginTop: 2,
   },
   tagChip: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 999,
-    backgroundColor: 'rgba(232, 202, 191, 0.5)',
+    backgroundColor: 'rgba(232, 202, 191, 0.6)',
   },
   tagText: {
     fontSize: 11,
     color: '#7b6c62',
   },
-  warningWrap: {
-    marginTop: 10,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(160, 132, 112, 0.18)',
-    gap: 4,
+  warningCard: {
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 236, 234, 0.9)',
+    padding: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(215, 110, 100, 0.5)',
+    gap: 8,
+  },
+  warningHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  warningTagRow: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  warningTagChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: 'rgba(215, 110, 100, 0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(215, 110, 100, 0.35)',
+  },
+  warningTagText: {
+    fontSize: 10,
+    color: '#8e3d35',
+    fontWeight: '600',
   },
   warningTitle: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#7c5e55',
+    fontWeight: '700',
+    color: '#8e3d35',
   },
   warningBody: {
+    fontSize: 13,
+    color: '#7b4a44',
+    lineHeight: 19,
+  },
+  warningChat: {
+    padding: 12,
+    borderRadius: 14,
+    backgroundColor: '#aebecd',
+    borderWidth: 1,
+    borderColor: '#9aaabb',
+    gap: 8,
+  },
+  chatHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+  },
+  chatDivider: {
+    height: 1,
+    backgroundColor: '#111111',
+    marginVertical: 2,
+  },
+  chatLabelPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255, 255, 255, 0.85)',
+    borderWidth: 1,
+    borderColor: '#dfe6ee',
+  },
+  chatLabelPillAlt: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255, 255, 255, 0.85)',
+    borderWidth: 1,
+    borderColor: '#dfe6ee',
+  },
+  chatLabelText: {
+    fontSize: 10,
+    color: '#5f6b78',
+    fontWeight: '600',
+  },
+  chatLabelTextAlt: {
+    fontSize: 10,
+    color: '#5f6b78',
+    fontWeight: '600',
+  },
+  chatBubbleGroup: {
+    alignItems: 'flex-start',
+  },
+  chatBubbleLeft: {
+    position: 'relative',
+    maxWidth: '100%',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e1e6ec',
+  },
+  chatTailLeft: {
+    position: 'absolute',
+    left: 12,
+    bottom: -4,
+    width: 8,
+    height: 8,
+    backgroundColor: '#ffffff',
+    transform: [{ rotate: '45deg' }],
+    borderLeftWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: '#e1e6ec',
+  },
+  chatBubbleText: {
     fontSize: 12,
-    color: '#6f5d52',
+    color: '#4b5561',
+    lineHeight: 18,
+  },
+  chatBubbleTextAlt: {
+    fontSize: 12,
+    color: '#4b5561',
     lineHeight: 18,
   },
   warningChip: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 999,
-    backgroundColor: 'rgba(202, 162, 142, 0.35)',
+    backgroundColor: 'rgba(214, 128, 118, 0.2)',
   },
   warningText: {
     fontSize: 11,
-    color: '#7b5a52',
-  },
-  riskLevel: {
-    marginTop: 8,
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#8a6e63',
+    color: '#8a4a44',
   },
 });
