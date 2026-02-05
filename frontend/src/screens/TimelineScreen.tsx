@@ -8,27 +8,12 @@ import TopBar from '@/src/components/TopBar';
 import JourneyHeader from '@/src/components/JourneyHeader';
 import TimelineCard, { type TimelineCardItem } from '@/src/components/TimelineCard';
 import SettingsMenu from '@/src/components/SettingsMenu';
-import SignalWarningSheet from '@/src/components/SignalWarningSheet';
-import { useDayRecords } from '@/src/context/day-records-context';
+import { fetchTimelineEntries } from '@/src/api/timeline';
+import { loadTimelineEntries } from '@/src/storage/timeline-storage';
 import type { BirdState as ModelBirdState } from '@/src/models/bird-state';
+import type { TimelineEntry } from '@/src/models/timeline-entry';
 import type { BirdState as VisualBirdState } from '@/src/components/BirdCharacter';
 import { getSeoulDateKey } from '@/src/utils/date';
-
-const FILTER_FLAG_MAP: Record<Exclude<FilterKey, 'all'>, keyof ReturnType<typeof useDayRecords>['records'][0]['flags']> = {
-  money: 'moneyRequest',
-  favor: 'favorRequest',
-  praise: 'excessivePraise',
-  link: 'linkIncluded',
-  image: 'imageIncluded',
-};
-
-const TAG_MAP = {
-  moneyRequest: '#금전언급',
-  favorRequest: '#부담감조성',
-  excessivePraise: '#신뢰강조',
-  linkIncluded: '#링크포함',
-  imageIncluded: '#이미지포함',
-};
 
 const STAGE_TAGS = {
   stage2: ['#비밀공유', '#개인사', '#신뢰강조'],
@@ -74,51 +59,9 @@ function formatMonthDay(date: string) {
   return `${month}월 ${day}일`;
 }
 
-function buildTagsFromFlags(flags: ReturnType<typeof useDayRecords>['records'][0]['flags']) {
-  const tags: string[] = [];
-  if (flags.moneyRequest) tags.push(TAG_MAP.moneyRequest);
-  if (flags.favorRequest) tags.push(TAG_MAP.favorRequest);
-  if (flags.excessivePraise) tags.push(TAG_MAP.excessivePraise);
-  if (flags.linkIncluded) tags.push(TAG_MAP.linkIncluded);
-  if (flags.imageIncluded) tags.push(TAG_MAP.imageIncluded);
-  return tags.length > 0 ? tags : ['#일상대화'];
-}
-
-function buildTitleSubtitle(flags: ReturnType<typeof useDayRecords>['records'][0]['flags']) {
-  if (flags.moneyRequest) {
-    return {
-      title: '금전과 관련된 말이 있었어요',
-      subtitle: '부담으로 느껴질 수 있는 표현이 등장했어요.',
-    };
-  }
-  if (flags.favorRequest) {
-    return {
-      title: '도움 요청이 등장했어요',
-      subtitle: '부탁이 이어지기 시작했어요.',
-    };
-  }
-  if (flags.excessivePraise) {
-    return {
-      title: '칭찬이 잦아졌어요',
-      subtitle: '신뢰를 강조하는 말이 늘어났어요.',
-    };
-  }
-  if (flags.linkIncluded) {
-    return {
-      title: '외부 링크가 포함됐어요',
-      subtitle: '링크를 주고받는 대화가 있었어요.',
-    };
-  }
-  if (flags.imageIncluded) {
-    return {
-      title: '이미지가 포함됐어요',
-      subtitle: '사진을 공유하는 흐름이 있었어요.',
-    };
-  }
-  return {
-    title: '오늘의 대화',
-    subtitle: '차분한 흐름으로 이어졌어요.',
-  };
+function ensureHashTags(tags: string[]) {
+  if (!tags.length) return ['#일상대화'];
+  return tags.map((tag) => (tag.startsWith('#') ? tag : `#${tag}`));
 }
 
 function deriveStage(tags: string[], totalCount: number) {
@@ -142,47 +85,72 @@ const WARNING_MESSAGE = '이 기록은 잠시 멈춰 다시 살펴볼 만한 부
 
 export default function TimelineScreen() {
   const router = useRouter();
-  const { records, markImmediateRiskShown } = useDayRecords();
+  const [entries, setEntries] = useState<TimelineEntry[]>([]);
   const [filter, setFilter] = useState<FilterKey>('all');
-  const [riskTargetId, setRiskTargetId] = useState<string | null>(null);
   const [warningTarget, setWarningTarget] = useState<TimelineCardItem | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [warningOpen, setWarningOpen] = useState(false);
   const todayKey = useMemo(() => getSeoulDateKey(), []);
 
-  const sortedRecords = useMemo(
-    () => [...records].sort((a, b) => b.date.localeCompare(a.date)),
-    [records]
-  );
+  useEffect(() => {
+    let mounted = true;
+    fetchTimelineEntries()
+      .then((data) => {
+        if (!mounted) return;
+        if (data.length > 0) {
+          setEntries(data);
+          return;
+        }
+        loadTimelineEntries().then((stored) => {
+          if (!mounted) return;
+          setEntries(stored);
+        });
+      })
+      .catch(() => {
+        if (!mounted) return;
+        loadTimelineEntries().then((stored) => {
+          if (!mounted) return;
+          setEntries(stored);
+        });
+      })
+      .finally(() => undefined);
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const sortedRecords = useMemo(() => [...entries].sort((a, b) => b.date.localeCompare(a.date)), [entries]);
 
   const items = useMemo(() => {
     if (sortedRecords.length === 0) return MOCK_ITEMS;
     return sortedRecords.map((record, index) => {
-      const tags = buildTagsFromFlags(record.flags);
-      const titles = buildTitleSubtitle(record.flags);
+      const tags = ensureHashTags(record.tags ?? []);
       const isToday = record.date === todayKey;
       const groupLabel = isToday ? '오늘' : `Day ${index + 1}`;
+      const title = record.summary || record.warningText || '오늘의 기록';
+      const subtitle = record.warningText ?? '차분한 흐름으로 이어졌어요.';
 
       return {
-        id: record.id,
+        id: record.id ?? record.date,
         groupLabel,
         dateLabel: formatMonthDay(record.date),
-        title: titles.title,
-        subtitle: titles.subtitle,
+        title,
+        subtitle,
         tags,
-        status: record.learned ? 'learned' : 'pending',
+        status: 'pending',
         birdState: mapBirdState(record.birdState),
-        __flags: record.flags,
-      } as TimelineCardItem & { __flags: typeof record.flags };
+        __meta: {
+          rawTags: [...(record.tags ?? []), ...(record.warningTags ?? [])].join(' '),
+          riskLevel: record.riskLevel ?? null,
+        },
+      } as TimelineCardItem & { __meta: { rawTags: string; riskLevel: number | null } };
     });
   }, [sortedRecords, todayKey]);
 
   const filtered = useMemo(() => {
     if (filter === 'all') return items;
-    const flagKey = FILTER_FLAG_MAP[filter];
     return items.filter((item) => {
-      const flags = (item as TimelineCardItem & { __flags?: ReturnType<typeof useDayRecords>['records'][0]['flags'] }).__flags;
-      return flags ? flags[flagKey] : item.tags.join(' ').includes(CHIP_LABELS[filter]);
+      const meta = (item as TimelineCardItem & { __meta?: { rawTags: string } }).__meta;
+      return meta ? meta.rawTags.includes(CHIP_LABELS[filter]) : item.tags.join(' ').includes(CHIP_LABELS[filter]);
     });
   }, [filter, items]);
 
@@ -197,7 +165,7 @@ export default function TimelineScreen() {
     cutoff.setDate(cutoff.getDate() - 7);
     return sortedRecords.filter((record) => {
       const date = new Date(record.date + 'T00:00:00');
-      const hasSignal = Object.values(record.flags).some(Boolean);
+      const hasSignal = (record.warningTags?.length ?? 0) > 0 || (record.riskLevel ?? 0) >= 3;
       return hasSignal && date >= cutoff;
     }).length;
   }, [sortedRecords]);
@@ -205,54 +173,9 @@ export default function TimelineScreen() {
   const highSignalToday = useMemo(() => {
     const today = sortedRecords[0];
     if (!today) return false;
-    const count = Object.values(today.flags).filter(Boolean).length;
-    return today.flags.moneyRequest || count >= 2;
+    const count = today.warningTags?.length ?? 0;
+    return (today.riskLevel ?? 0) >= 3 || count >= 2;
   }, [sortedRecords]);
-
-  useEffect(() => {
-    const candidate = records.find(
-      (record) =>
-        !record.immediateRiskShown &&
-        ((record.immediateRisk?.scamUrl ?? false) ||
-          (record.immediateRisk?.reportedAccount ?? false) ||
-          (record.immediateRisk?.aiImage ?? false)),
-    );
-    if (candidate) {
-      setRiskTargetId(candidate.id);
-    }
-  }, [records]);
-
-  const riskLabels = useMemo(() => {
-    if (!riskTargetId) return [];
-    const target = records.find((record) => record.id === riskTargetId);
-    if (!target || !target.immediateRisk) return [];
-    return [
-      target.immediateRisk.scamUrl ? '신고된 링크' : null,
-      target.immediateRisk.reportedAccount ? '신고된 계좌' : null,
-      target.immediateRisk.aiImage ? '합성 이미지' : null,
-    ].filter(Boolean) as string[];
-  }, [records, riskTargetId]);
-
-  const handleRiskDismiss = async () => {
-    if (riskTargetId) {
-      const target = records.find((record) => record.id === riskTargetId);
-      if (target) {
-        await markImmediateRiskShown(target.date);
-      }
-    }
-    setRiskTargetId(null);
-  };
-
-  const handleRiskReport = async () => {
-    if (riskTargetId) {
-      const target = records.find((record) => record.id === riskTargetId);
-      if (target) {
-        await markImmediateRiskShown(target.date);
-      }
-    }
-    setRiskTargetId(null);
-    router.push('/(tabs)/profile/report');
-  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -266,17 +189,17 @@ export default function TimelineScreen() {
 
             <JourneyHeader activeIndex={stageIndex} birdState="healthy" onRewindPress={() => { /* TODO: rewind modal */ }} />
 
-            <Pressable style={styles.warningButton} onPress={() => setWarningOpen(true)} accessibilityRole="button">
+            <View style={styles.warningButton}>
               <View style={styles.warningButtonLeft}>
                 <Ionicons name="alert-circle" size={16} color="#6c5f56" />
-                <Text style={styles.warningButtonText}>주의 흐름 살펴보기</Text>
+                <Text style={styles.warningButtonText}>주의 흐름</Text>
               </View>
               <View style={styles.warningBadge}>
                 <Text style={styles.warningBadgeText}>
                   {highSignalToday ? '오늘 강한 신호' : `최근 7일 ${last7Count}개 신호`}
                 </Text>
               </View>
-            </Pressable>
+            </View>
 
             <FilterChips selected={filter} onSelect={setFilter} />
           </View>
@@ -310,32 +233,7 @@ export default function TimelineScreen() {
         </View>
       ) : null}
 
-      {riskTargetId ? (
-        <View style={styles.overlay}>
-          <View style={styles.overlayCard}>
-            <Text style={styles.overlayTitle}>이미 신고된 사기 정보입니다.</Text>
-            <View style={styles.overlayList}>
-              {riskLabels.map((label) => (
-                <Text key={label} style={styles.overlayItem}>
-                  {label}
-                </Text>
-              ))}
-            </View>
-            <View style={styles.overlayActions}>
-              <Pressable style={styles.overlayButtonGhost} onPress={() => void handleRiskDismiss()}>
-                <Text style={styles.overlayGhostText}>닫기</Text>
-              </Pressable>
-              <Pressable style={styles.overlayButton} onPress={() => void handleRiskReport()}>
-                <Text style={styles.overlayButtonText}>Report로 이동</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      ) : null}
-
       <SettingsMenu visible={settingsOpen} onClose={() => setSettingsOpen(false)} />
-
-      <SignalWarningSheet visible={warningOpen} records={sortedRecords} onClose={() => setWarningOpen(false)} />
     </SafeAreaView>
   );
 }
@@ -477,6 +375,3 @@ const styles = StyleSheet.create({
     color: '#7b6c62',
   },
 });
-
-
-

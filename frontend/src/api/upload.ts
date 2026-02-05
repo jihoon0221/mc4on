@@ -24,6 +24,16 @@ export type KakaoUploadResponse = {
   last_ingested_date: string | null;
   upload_date?: string | null;
   analysis_result: null | (Omit<AnalysisResult, 'learning_items'> & { learning_items?: LearningItemResponse[] });
+  timeline?: Array<{
+    analysis_date: string;
+    summary_short: string | null;
+    tags: string[];
+    warning_text: string | null;
+    warning_tags: string[];
+    risk_level: number | null;
+    bird_state: number;
+  }>;
+  dailyreport?: Array<Omit<AnalysisResult, 'learning_items'> & { learning_items?: LearningItemResponse[] }>;
 };
 
 type KakaoUploadInput = {

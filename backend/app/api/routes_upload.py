@@ -4,6 +4,7 @@ from datetime import date
 import logging
 import json
 from io import BytesIO
+from pathlib import Path
 import uuid
 import zipfile
 
@@ -38,6 +39,9 @@ from app.services.kakao_samples import get_sample_kakao_text
 
 router = APIRouter(prefix="/upload", tags=["upload"])
 logger = logging.getLogger(__name__)
+_BASE_DIR = Path(__file__).resolve().parents[2]
+_MOCK_JIHOON_PATH = _BASE_DIR / "services" / "result_jihoon.json"
+_MOCK_DANIEL_PATH = _BASE_DIR / "services" / "result_kakao_samples_frontend.json"
 
 
 def _get_or_create_conversation(db: Session, user_id: uuid.UUID) -> Conversation:
@@ -215,6 +219,10 @@ def upload_kakao(
         text = _decode_kakao_bytes(raw)
         zip_photos = []
     chat_file.file.seek(0)
+
+    mock_payload = _build_mock_response(text, convo.id)
+    if mock_payload is not None:
+        return mock_payload
 
     photo_dates, photo_flags = _ingest_photos(
         db=db,
@@ -478,6 +486,72 @@ def _ingest_kakao_text(
         },
     )
     return payload
+
+
+def _build_mock_response(text: str, conversation_id: uuid.UUID) -> dict[str, object] | None:
+    if "신지훈" in text:
+        path = _MOCK_JIHOON_PATH
+    elif "Daniel" in text:
+        path = _MOCK_DANIEL_PATH
+    else:
+        return None
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        logger.error("mock_response_load_failed", extra={"path": str(path), "error": str(exc)})
+        return None
+
+    if isinstance(raw, list):
+        timeline = raw
+        dailyreport = []
+    else:
+        timeline = raw.get("timeline") or []
+        dailyreport = raw.get("dailyreport") or []
+
+    def _parse_date(value: str) -> date | None:
+        try:
+            return date.fromisoformat(value)
+        except Exception:
+            return None
+
+    dates = []
+    for item in timeline:
+        if isinstance(item, dict):
+            value = item.get("analysis_date")
+            if isinstance(value, str):
+                parsed = _parse_date(value)
+                if parsed:
+                    dates.append(parsed)
+    for item in dailyreport:
+        if isinstance(item, dict):
+            value = item.get("analysis_date")
+            if isinstance(value, str):
+                parsed = _parse_date(value)
+                if parsed:
+                    dates.append(parsed)
+
+    upload_date = max(dates).isoformat() if dates else None
+    dailyreport_sorted = sorted(
+        [item for item in dailyreport if isinstance(item, dict)],
+        key=lambda item: item.get("analysis_date") or "",
+    )
+    analysis_result = dailyreport_sorted[-1] if dailyreport_sorted else None
+
+    return {
+        "conversation_id": str(conversation_id),
+        "upload_id": None,
+        "ingested_messages": 0,
+        "skipped_messages": 0,
+        "analysis_job_id": None,
+        "analysis_status": "DONE",
+        "analysis_jobs": [],
+        "last_ingested_date": upload_date,
+        "upload_date": upload_date,
+        "analysis_results": dailyreport_sorted,
+        "analysis_result": analysis_result,
+        "timeline": timeline,
+        "dailyreport": dailyreport_sorted,
+    }
 
 
 def _serialize_analysis_result(
