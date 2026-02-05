@@ -47,6 +47,7 @@ def _generate_groq_digest(
     warning_tags = _normalize_warning_tags(response.get("warning_tags"))
     learning_items = _normalize_learning_items(
         response.get("learning_items"),
+        message_texts,
         learning_language,
     )
     if not summary:
@@ -72,7 +73,10 @@ def _fallback_digest(
     rule_events = extract_events_from_messages(message_texts)
     warning_tags = tags_from_events(rule_events)
     tags = _fallback_keyword_tags(message_texts)
-    learning_items = _fallback_learning_items(message_texts, learning_language)
+    learning_items = _fallback_learning_items_from_messages(
+        message_texts,
+        learning_language,
+    )
     return {
         "summary": summary,
         "tags": tags,
@@ -111,7 +115,8 @@ def _build_prompt(
         "tags는 대화 내용에서 뽑은 핵심 키워드를 자유롭게 작성하세요.\n"
         "warning_tags는 제공된 목록에서만 선택하세요. 암시적 금전 요구도 태그에 포함하세요.\n"
         "tags는 최대 5개, warning_tags는 경고 근거로 사용할 항목만 0~3개로 선택하세요.\n"
-        "학습 아이템은 한국어(content_kr)와 상대방 언어(content_fl)를 모두 작성하세요. "
+        "학습 아이템은 오늘 대화에서 실제로 나온 문장을 2~3개 고르고, "
+        "각 문장을 한국어(content_kr)로 정리한 뒤 상대방 언어(content_fl)로 번역하세요. "
         f"content_fl은 {language}로 작성하세요. "
         "content_type은 sentence만 사용하고, 모두 완전한 문장으로 작성하세요.\n"
         f"warning_tags 목록: {tag_list}\n"
@@ -124,36 +129,41 @@ def _build_prompt(
     )
 
 
-def _fallback_learning_items(
+def _fallback_learning_items_from_messages(
     message_texts: list[str],
     learning_language: str | None = None,
 ) -> list[dict[str, str]]:
-    sample = " ".join(message_texts[:2]).strip().lower()
-    language = (learning_language or "en").lower()
-    items_kr = [
-        "오늘도 안부를 전할 수 있어 기뻐요.",
-        "천천히 확인해도 괜찮아요.",
-        "부담 없이 대화를 이어가요.",
-    ]
-    items_fl = [
-        "I hope you're doing well.",
-        "I appreciate your message.",
-        "It's okay to take things slowly.",
-    ]
-    if "thank" in sample:
-        items_fl[2] = "Thank you for sharing that with me."
-    return [
-        {
-            "content_kr": items_kr[idx],
-            "content_fl": items_fl[idx],
-            "content_type": "sentence",
-        }
-        for idx in range(3)
-    ]
+    if not message_texts:
+        return []
+    items: list[dict[str, str]] = []
+    seen = set()
+    for text in message_texts:
+        for line in text.splitlines():
+            cleaned = " ".join(line.strip().split())
+            if not cleaned or cleaned in seen:
+                continue
+            seen.add(cleaned)
+            content_kr = cleaned
+            if learning_language and learning_language.lower() == "korean":
+                content_fl = content_kr
+            else:
+                # No translator in fallback; keep Korean as-is.
+                content_fl = content_kr
+            items.append(
+                {
+                    "content_kr": content_kr,
+                    "content_fl": content_fl,
+                    "content_type": "sentence",
+                }
+            )
+            if len(items) >= 3:
+                return items
+    return items
 
 
 def _normalize_learning_items(
     value: object,
+    message_texts: list[str],
     learning_language: str | None,
 ) -> list[dict[str, str]]:
     items: list[dict[str, str]] = []
@@ -175,7 +185,7 @@ def _normalize_learning_items(
             )
     if len(items) >= 3:
         return items[:3]
-    return _fallback_learning_items([], learning_language)
+    return _fallback_learning_items_from_messages(message_texts, learning_language)
 
 
 def _normalize_tags(value: object) -> list[str]:

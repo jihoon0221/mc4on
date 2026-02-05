@@ -26,6 +26,98 @@ from app.services.external_checks import check_account, check_link
 from app.services.risk import bird_state_from_risk_level
 
 
+def _normalize_text(value: str | None) -> str:
+    return " ".join((value or "").strip().split())
+
+
+def _language_from_country(country: str | None) -> str | None:
+    if not country:
+        return None
+    normalized = _normalize_text(country).lower()
+    mapping = {
+        "korea": "Korean",
+        "south korea": "Korean",
+        "대한민국": "Korean",
+        "한국": "Korean",
+        "japan": "Japanese",
+        "일본": "Japanese",
+        "china": "Chinese",
+        "중국": "Chinese",
+        "usa": "English",
+        "united states": "English",
+        "미국": "English",
+        "uk": "English",
+        "united kingdom": "English",
+        "영국": "English",
+        "canada": "English",
+        "australia": "English",
+        "singapore": "English",
+        "philippines": "English",
+        "india": "English",
+        "malaysia": "Malay",
+        "vietnam": "Vietnamese",
+        "thailand": "Thai",
+        "indonesia": "Indonesian",
+        "russia": "Russian",
+        "france": "French",
+        "germany": "German",
+        "spain": "Spanish",
+        "italy": "Italian",
+        "turkey": "Turkish",
+        "brazil": "Portuguese",
+        "mexico": "Spanish",
+    }
+    return mapping.get(normalized)
+
+
+def _language_from_user_pref(language: str | None) -> str | None:
+    if not language:
+        return None
+    normalized = _normalize_text(language).lower()
+    mapping = {
+        "ko": "Korean",
+        "kr": "Korean",
+        "korean": "Korean",
+        "en": "English",
+        "english": "English",
+        "ja": "Japanese",
+        "jp": "Japanese",
+        "japanese": "Japanese",
+        "zh": "Chinese",
+        "chinese": "Chinese",
+        "vi": "Vietnamese",
+        "vietnamese": "Vietnamese",
+        "th": "Thai",
+        "thai": "Thai",
+        "id": "Indonesian",
+        "indonesian": "Indonesian",
+        "ms": "Malay",
+        "malay": "Malay",
+        "ru": "Russian",
+        "russian": "Russian",
+        "fr": "French",
+        "french": "French",
+        "de": "German",
+        "german": "German",
+        "es": "Spanish",
+        "spanish": "Spanish",
+        "it": "Italian",
+        "italian": "Italian",
+        "tr": "Turkish",
+        "turkish": "Turkish",
+        "pt": "Portuguese",
+        "portuguese": "Portuguese",
+    }
+    return mapping.get(normalized, language)
+
+
+def _resolve_learning_language(user: User) -> str | None:
+    by_country = _language_from_country(user.partner_country)
+    if by_country:
+        return by_country
+    return "English"
+
+
 def enqueue_analysis_job(
     db: Session,
     conversation_id,
@@ -124,7 +216,7 @@ def process_job(db: Session, job: AnalysisJob) -> AnalysisResult | None:
             photo_flags=photo_flags,
             partner_country=user.partner_country,
             partner_job=user.partner_job,
-            learning_language=user.language,
+            learning_language=_resolve_learning_language(user),
         ).result
 
         job.status = AnalysisJobStatusEnum.done

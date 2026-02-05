@@ -95,11 +95,20 @@ def list_timeline(
     results = db.execute(
         select(AnalysisResult)
         .where(AnalysisResult.conversation_id == convo.id)
-        .order_by(AnalysisResult.analysis_date.desc())
-        .limit(limit)
+        .order_by(AnalysisResult.analysis_date.desc(), AnalysisResult.created_at.desc())
     ).scalars().all()
 
-    bird_state_map = _build_bird_state_map(db, convo.id, results)
+    deduped: list[AnalysisResult] = []
+    seen_dates: set[date] = set()
+    for result in results:
+        if result.analysis_date in seen_dates:
+            continue
+        seen_dates.add(result.analysis_date)
+        deduped.append(result)
+        if len(deduped) >= limit:
+            break
+
+    bird_state_map = _build_bird_state_map(db, convo.id, deduped)
     return [
         {
             "analysis_date": result.analysis_date.isoformat(),
@@ -110,7 +119,7 @@ def list_timeline(
             "risk_level": result.risk_level,
             "bird_state": bird_state_map.get(result.id, 0),
         }
-        for result in results
+        for result in deduped
     ]
 
 
@@ -137,6 +146,8 @@ def get_timeline_entry(
             AnalysisResult.conversation_id == convo.id,
             AnalysisResult.analysis_date == entry_date,
         )
+        .order_by(AnalysisResult.created_at.desc())
+        .limit(1)
     ).scalar_one_or_none()
     if result is None:
         raise HTTPException(

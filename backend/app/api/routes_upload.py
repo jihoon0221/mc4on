@@ -522,10 +522,6 @@ def _serialize_learning_items(
             {
                 "content_kr": content_kr,
                 "content_fl": content_fl,
-                "content_type": item.content_type.value,
-                "review_due_date": item.review_due_date.isoformat()
-                if item.review_due_date
-                else None,
             }
         )
     return payloads
