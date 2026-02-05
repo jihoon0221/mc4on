@@ -489,9 +489,10 @@ def _ingest_kakao_text(
 
 
 def _build_mock_response(text: str, conversation_id: uuid.UUID) -> dict[str, object] | None:
+    lowered = text.lower()
     if "신지훈" in text:
         path = _MOCK_JIHOON_PATH
-    elif "Daniel" in text:
+    elif "daniel" in lowered:
         path = _MOCK_DANIEL_PATH
     else:
         return None
