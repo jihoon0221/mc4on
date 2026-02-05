@@ -44,7 +44,7 @@ def _generate_groq_digest(
         return _fallback_digest(message_texts, learning_language)
     summary = response.get("summary")
     tags = _normalize_tags(response.get("tags"))
-    warning_tags = _normalize_warning_tags(response.get("warning_tags"), tags)
+    warning_tags = _normalize_warning_tags(response.get("warning_tags"))
     learning_items = _normalize_learning_items(
         response.get("learning_items"),
         learning_language,
@@ -70,12 +70,13 @@ def _fallback_digest(
         excerpt = message_texts[0][:120].strip()
         summary = f"오늘 대화 요약(샘플): {excerpt}" if excerpt else "오늘 대화 요약(샘플)."
     rule_events = extract_events_from_messages(message_texts)
-    tags = tags_from_events(rule_events)
+    warning_tags = tags_from_events(rule_events)
+    tags = _fallback_keyword_tags(message_texts)
     learning_items = _fallback_learning_items(message_texts, learning_language)
     return {
         "summary": summary,
         "tags": tags,
-        "warning_tags": _default_warning_tags(tags),
+        "warning_tags": warning_tags,
         "learning_items": learning_items,
     }
 
@@ -107,12 +108,13 @@ def _build_prompt(
         "다음 대화를 요약하고 위험 태그를 분류하세요. 단정/판정은 하지 마세요.\n"
         "요약은 2~3줄로 작성하고, 4줄을 넘기지 마세요.\n"
         "문장 끝은 부드럽게 마무리하세요. 예: \"~했어요\", \"~하셨네요\", \"~처럼 보였어요\".\n"
-        "태그는 제공된 목록에서만 선택하세요. 암시적 금전 요구도 태그에 포함하세요.\n"
+        "tags는 대화 내용에서 뽑은 핵심 키워드를 자유롭게 작성하세요.\n"
+        "warning_tags는 제공된 목록에서만 선택하세요. 암시적 금전 요구도 태그에 포함하세요.\n"
         "tags는 최대 5개, warning_tags는 경고 근거로 사용할 항목만 0~3개로 선택하세요.\n"
         "학습 아이템은 한국어(content_kr)와 상대방 언어(content_fl)를 모두 작성하세요. "
         f"content_fl은 {language}로 작성하세요. "
         "content_type은 sentence만 사용하고, 모두 완전한 문장으로 작성하세요.\n"
-        f"태그 목록: {tag_list}\n"
+        f"warning_tags 목록: {tag_list}\n"
         "이전 대화 요약(최근 흐름):\n"
         f"{context if context else '- (없음)'}\n\n"
         "오늘 대화:\n"
@@ -179,25 +181,49 @@ def _normalize_learning_items(
 def _normalize_tags(value: object) -> list[str]:
     if not value:
         return []
+    items: list[str] = []
     if isinstance(value, list):
-        return [item for item in value if isinstance(item, str) and item in TAG_TAXONOMY][:5]
+        candidates = value
+    else:
+        candidates = [value]
+    for item in candidates:
+        if not isinstance(item, str):
+            continue
+        cleaned = " ".join(item.strip().split())
+        if not cleaned:
+            continue
+        items.append(cleaned[:30])
+        if len(items) >= 5:
+            break
+    return items
+
+
+def _normalize_warning_tags(value: object) -> list[str]:
+    if not value:
+        return []
+    if isinstance(value, list):
+        filtered = [item for item in value if isinstance(item, str) and item in TAG_TAXONOMY]
+        return filtered[:3]
     if isinstance(value, str) and value in TAG_TAXONOMY:
         return [value]
     return []
 
 
-def _normalize_warning_tags(value: object, tags: list[str]) -> list[str]:
-    if not value:
-        return []
-    if isinstance(value, list):
-        filtered = [item for item in value if isinstance(item, str) and item in TAG_TAXONOMY]
-        return [item for item in filtered if item in tags][:3]
-    if isinstance(value, str) and value in tags:
-        return [value]
-    return []
+def _fallback_keyword_tags(message_texts: list[str]) -> list[str]:
+    import re
 
-
-def _default_warning_tags(tags: list[str]) -> list[str]:
-    if not tags:
+    if not message_texts:
         return []
-    return tags[:3]
+    text = " ".join(message_texts[:5])
+    tokens = re.findall(r"[A-Za-z0-9가-힣]{2,}", text)
+    seen = set()
+    keywords: list[str] = []
+    for token in tokens:
+        key = token.strip()
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        keywords.append(key[:30])
+        if len(keywords) >= 5:
+            break
+    return keywords

@@ -66,7 +66,7 @@ def run_daily_analysis(
 
     summary_text = _build_summary(message_texts, ai_summary)
     warning_text = _build_warning_message(
-        _map_tag_labels(ai_warning_tags or ai_tags),
+        _map_tag_labels(ai_warning_tags),
         assessment.risk_level,
     )
     summary_short_text = _build_summary_short(summary_text, message_texts)
@@ -81,7 +81,7 @@ def run_daily_analysis(
         summary_short_text=summary_short_text,
         warning_text=warning_text,
         risk_explanation_text=risk_explanation_text,
-        tags_text=",".join(_map_tag_labels(ai_tags)) if ai_tags else None,
+        tags_text=",".join(ai_tags) if ai_tags else None,
         warning_tags_text=",".join(_map_tag_labels(ai_warning_tags)) if ai_warning_tags else None,
     )
     db.add(result)

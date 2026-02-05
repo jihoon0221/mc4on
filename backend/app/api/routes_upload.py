@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+import logging
 import json
 from io import BytesIO
 import uuid
@@ -36,6 +37,7 @@ from app.services.storage import store_encrypted_bytes, store_encrypted_upload
 from app.services.kakao_samples import get_sample_kakao_text
 
 router = APIRouter(prefix="/upload", tags=["upload"])
+logger = logging.getLogger(__name__)
 
 
 def _get_or_create_conversation(db: Session, user_id: uuid.UUID) -> Conversation:
@@ -446,7 +448,7 @@ def _ingest_kakao_text(
         else []
     )
 
-    return {
+    payload = {
         "conversation_id": str(convo.id),
         "upload_id": str(upload.id) if upload else None,
         "ingested_messages": len(new_messages),
@@ -461,6 +463,21 @@ def _ingest_kakao_text(
         if convo.last_ingested_date
         else None,
     }
+    logger.info(
+        "upload_kakao_response",
+        extra={
+            "conversation_id": payload.get("conversation_id"),
+            "upload_id": payload.get("upload_id"),
+            "ingested_messages": payload.get("ingested_messages"),
+            "skipped_messages": payload.get("skipped_messages"),
+            "analysis_jobs": payload.get("analysis_jobs"),
+            "analysis_status": payload.get("analysis_status"),
+            "analysis_result_present": bool(payload.get("analysis_result")),
+            "analysis_results_count": len(payload.get("analysis_results") or []),
+            "last_ingested_date": payload.get("last_ingested_date"),
+        },
+    )
+    return payload
 
 
 def _serialize_analysis_result(
