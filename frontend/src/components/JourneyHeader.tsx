@@ -9,10 +9,19 @@ type JourneyHeaderProps = {
   activeIndex: number;
   caption?: string;
   onRewindPress?: () => void;
+  onCtaPress?: () => void;
+  ctaLabel?: string;
   birdState?: BirdState;
 };
 
-export default function JourneyHeader({ activeIndex, caption, onRewindPress, birdState = 'healthy' }: JourneyHeaderProps) {
+export default function JourneyHeader({
+  activeIndex,
+  caption,
+  onRewindPress,
+  onCtaPress,
+  ctaLabel,
+  birdState = 'healthy',
+}: JourneyHeaderProps) {
   const [debugOpen, setDebugOpen] = React.useState(false);
   const [debugIndex, setDebugIndex] = React.useState<number | null>(null);
   const maxIndex = STAGE_LABELS.length - 1;
@@ -74,6 +83,14 @@ export default function JourneyHeader({ activeIndex, caption, onRewindPress, bir
           </View>
         </ImageBackground>
       </View>
+
+      {onCtaPress ? (
+        <View style={styles.ctaRow}>
+          <Pressable style={styles.ctaButton} onPress={onCtaPress} accessibilityRole="button">
+            <Text style={styles.ctaText}>{ctaLabel ?? '이렇게 흘러왔어요.'}</Text>
+          </Pressable>
+        </View>
+      ) : null}
 
       <View style={styles.captionRow}>
         <Text style={styles.captionText}>{caption ?? '처음부터 여기까지, 이렇게 흘러왔어요.'}</Text>
@@ -316,5 +333,19 @@ const styles = StyleSheet.create({
   rewindText: {
     fontSize: 12,
     color: '#8b7a6f',
+  },
+  ctaRow: {
+    alignItems: 'flex-end',
+  },
+  ctaButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 14,
+    backgroundColor: 'rgba(215, 191, 176, 0.6)',
+  },
+  ctaText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6d5f55',
   },
 });

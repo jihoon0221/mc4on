@@ -1,7 +1,7 @@
 ﻿import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 import InlineToast from '@/src/components/InlineToast';
 import LearnCard from '@/src/components/LearnCard';
@@ -110,14 +110,12 @@ export default function LearnScreen({
   const [analysisOverride, setAnalysisOverride] = useState<AnalysisResult | null>(null);
   const activeAnalysis = analysisOverride ?? analysis;
   const showDebug = typeof __DEV__ !== 'undefined' && __DEV__;
-  const analysisDebug = activeAnalysis
-    ? `analysis: date=${activeAnalysis.analysis_date} summary=${activeAnalysis.summary_text ? 'y' : 'n'} items=${activeAnalysis.learning_items.length}${
-        analysisOverride ? ' (override)' : ''
-      }`
-    : 'analysis: none';
   const [debugOpen, setDebugOpen] = useState(false);
   const [debugDate, setDebugDate] = useState('');
   const [debugError, setDebugError] = useState('');
+  const [debugHistory, setDebugHistory] = useState<ReportHistoryItem[]>([]);
+  const [debugMonth, setDebugMonth] = useState('');
+  const [debugLoading, setDebugLoading] = useState(false);
   const [dayIndex, setDayIndex] = useState<number | null>(null);
 
   const demoSentences = [
@@ -131,8 +129,47 @@ export default function LearnScreen({
     'Could you send just one more photo?',
   ];
 
+  const availableDates = useMemo(
+    () => debugHistory.map((item) => item.analysis_date).filter(Boolean),
+    [debugHistory]
+  );
+  const availableDateSet = useMemo(() => new Set(availableDates), [availableDates]);
+  const availableMonths = useMemo(() => {
+    const unique = Array.from(new Set(availableDates.map((date) => date.slice(0, 7))));
+    return unique.sort();
+  }, [availableDates]);
+  const monthIndex = useMemo(
+    () => availableMonths.findIndex((month) => month === debugMonth),
+    [availableMonths, debugMonth]
+  );
+
+  const monthInfo = useMemo(() => {
+    if (!debugMonth) return null;
+    const [yearText, monthText] = debugMonth.split('-');
+    const year = Number(yearText);
+    const month = Number(monthText);
+    if (!year || !month) return null;
+    const firstDay = new Date(year, month - 1, 1).getDay();
+    const daysInMonth = new Date(year, month, 0).getDate();
+    return { year, month, firstDay, daysInMonth };
+  }, [debugMonth]);
+
+  const calendarCells = useMemo(() => {
+    if (!monthInfo) return [];
+    const cells: Array<{ key: string; date?: string; label?: string }> = [];
+    for (let i = 0; i < monthInfo.firstDay; i += 1) {
+      cells.push({ key: `empty-${i}` });
+    }
+    for (let day = 1; day <= monthInfo.daysInMonth; day += 1) {
+      const date = `${monthInfo.year}-${String(monthInfo.month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      cells.push({ key: date, date, label: String(day) });
+    }
+    return cells;
+  }, [monthInfo]);
+
   const learningItems: LearningItem[] = activeAnalysis?.learning_items ?? [];
   const useDemo = learningItems.length === 0 && (!todayRecord || (todayRecord.nativeSentences?.length ?? 0) === 0);
+  const hasWarning = Boolean(activeAnalysis?.warning_text && activeAnalysis.warning_text.trim().length > 0);
   const sentences = useDemo
     ? demoSentences
     : learningItems.length > 0
@@ -165,6 +202,37 @@ export default function LearnScreen({
     if (!analysis?.analysis_date) return;
     setDebugDate((prev) => (prev ? prev : analysis.analysis_date));
   }, [analysis?.analysis_date]);
+
+  useEffect(() => {
+    if (!showDebug || !debugOpen) return;
+    let cancelled = false;
+    setDebugLoading(true);
+    setDebugError('');
+    (async () => {
+      try {
+        const history = await apiFetch<ReportHistoryResponse>('/reports/history?limit=365');
+        const items = history.items.filter((item) => item.analysis_date);
+        if (cancelled) return;
+        setDebugHistory(items);
+        const fallbackDate =
+          analysisOverride?.analysis_date ??
+          analysis?.analysis_date ??
+          items[items.length - 1]?.analysis_date ??
+          '';
+        const monthCandidates = Array.from(new Set(items.map((item) => item.analysis_date.slice(0, 7)))).sort();
+        const nextMonth = fallbackDate ? fallbackDate.slice(0, 7) : monthCandidates[0] ?? '';
+        setDebugMonth(nextMonth);
+        if (fallbackDate) setDebugDate(fallbackDate);
+      } catch {
+        if (!cancelled) setDebugError('히스토리를 불러오지 못했어요.');
+      } finally {
+        if (!cancelled) setDebugLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [debugOpen, showDebug, analysisOverride?.analysis_date, analysis?.analysis_date]);
 
   useEffect(() => {
     let cancelled = false;
@@ -260,36 +328,25 @@ export default function LearnScreen({
     }
   };
 
-  const handleDebugApply = async () => {
-    const normalized = debugDate.trim();
-    if (!normalized) {
-      setDebugError('날짜를 입력해 주세요.');
-      return;
-    }
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
-      setDebugError('YYYY-MM-DD 형식으로 입력해 주세요.');
+  const handleDebugPick = (date: string) => {
+    setDebugDate(date);
+    const found = debugHistory.find((item) => item.analysis_date === date);
+    const normalizedItem = normalizeReportItem(found);
+    if (!normalizedItem) {
+      setAnalysisOverride(null);
+      setDebugError('해당 날짜 분석 결과가 없어요.');
       return;
     }
     setDebugError('');
-    try {
-      const history = await apiFetch<ReportHistoryResponse>('/reports/history?limit=120');
-      const found = history.items.find((item) => item.analysis_date === normalized);
-      const normalizedItem = normalizeReportItem(found);
-      if (!normalizedItem) {
-        setAnalysisOverride(null);
-        setDebugError('해당 날짜 분석 결과가 없어요.');
-        return;
-      }
-      setAnalysisOverride(normalizedItem);
-    } catch {
-      setDebugError('히스토리를 불러오지 못했어요.');
-    }
+    setAnalysisOverride(normalizedItem);
   };
 
   const handleDebugReset = () => {
     setAnalysisOverride(null);
     setDebugError('');
-    setDebugDate(analysis?.analysis_date ?? '');
+    const nextDate = analysis?.analysis_date ?? '';
+    setDebugDate(nextDate);
+    if (nextDate) setDebugMonth(nextDate.slice(0, 7));
   };
 
   useEffect(() => {
@@ -317,26 +374,82 @@ export default function LearnScreen({
                 : formatDateLabel(todayKey)}
           </Text>
           <Text style={styles.helper}>상대의 말, 상대의 언어로 다시 말해봐요.</Text>
-          {showDebug ? <Text style={styles.debugText}>{analysisDebug}</Text> : null}
           {showDebug && debugOpen ? (
             <View style={styles.debugPanel}>
-              <Text style={styles.debugLabel}>분석 날짜 (YYYY-MM-DD)</Text>
-              <View style={styles.debugInputRow}>
-                <TextInput
-                  style={styles.debugInput}
-                  value={debugDate}
-                  onChangeText={setDebugDate}
-                  placeholder="2026-02-05"
-                  placeholderTextColor="#b0a197"
-                  autoCapitalize="none"
-                />
-                <Pressable style={styles.debugApplyButton} onPress={() => void handleDebugApply()}>
-                  <Text style={styles.debugApplyText}>적용</Text>
-                </Pressable>
+              <View style={styles.debugPanelHeader}>
+                <Text style={styles.debugLabel}>분석 날짜 선택</Text>
                 <Pressable style={styles.debugResetButton} onPress={handleDebugReset}>
                   <Text style={styles.debugResetText}>원복</Text>
                 </Pressable>
               </View>
+              {debugLoading ? (
+                <Text style={styles.debugLoadingText}>불러오는 중...</Text>
+              ) : availableMonths.length === 0 ? (
+                <Text style={styles.debugLoadingText}>데이터가 없어요.</Text>
+              ) : (
+                <View style={styles.debugCalendarCard}>
+                  <View style={styles.debugMonthRow}>
+                    <Pressable
+                      style={[styles.debugMonthButton, monthIndex <= 0 && styles.debugMonthButtonDisabled]}
+                      onPress={() => {
+                        if (monthIndex > 0) setDebugMonth(availableMonths[monthIndex - 1]);
+                      }}>
+                      <Text style={styles.debugMonthButtonText}>이전</Text>
+                    </Pressable>
+                    <Text style={styles.debugMonthText}>{debugMonth.replace('-', '.')}</Text>
+                    <Pressable
+                      style={[
+                        styles.debugMonthButton,
+                        monthIndex < 0 || monthIndex >= availableMonths.length - 1
+                          ? styles.debugMonthButtonDisabled
+                          : null,
+                      ]}
+                      onPress={() => {
+                        if (monthIndex >= 0 && monthIndex < availableMonths.length - 1) {
+                          setDebugMonth(availableMonths[monthIndex + 1]);
+                        }
+                      }}>
+                      <Text style={styles.debugMonthButtonText}>다음</Text>
+                    </Pressable>
+                  </View>
+                  <View style={styles.debugWeekRow}>
+                    {['일', '월', '화', '수', '목', '금', '토'].map((label) => (
+                      <Text key={label} style={styles.debugWeekText}>
+                        {label}
+                      </Text>
+                    ))}
+                  </View>
+                  <View style={styles.debugCalendarGrid}>
+                    {calendarCells.map((cell) =>
+                      cell.date ? (
+                        <Pressable
+                          key={cell.key}
+                          style={[
+                            styles.debugDayCell,
+                            availableDateSet.has(cell.date) ? styles.debugDayActive : styles.debugDayDisabled,
+                            debugDate === cell.date ? styles.debugDaySelected : null,
+                          ]}
+                          onPress={() => {
+                            if (availableDateSet.has(cell.date)) {
+                              handleDebugPick(cell.date);
+                            }
+                          }}>
+                          <Text
+                            style={[
+                              styles.debugDayText,
+                              availableDateSet.has(cell.date) ? styles.debugDayTextActive : styles.debugDayTextDisabled,
+                              debugDate === cell.date ? styles.debugDayTextSelected : null,
+                            ]}>
+                            {cell.label}
+                          </Text>
+                        </Pressable>
+                      ) : (
+                        <View key={cell.key} style={styles.debugDayEmpty} />
+                      )
+                    )}
+                  </View>
+                </View>
+              )}
               {debugError ? <Text style={styles.debugError}>{debugError}</Text> : null}
             </View>
           ) : null}
@@ -401,59 +514,57 @@ export default function LearnScreen({
               ) : null}
             </View>
 
-            <View style={styles.warningCard}>
-              <View style={styles.warningHeader}>
-                <Text style={styles.warningTitle}>주의 메시지</Text>
-                {activeAnalysis.warning_tags?.length ? (
-                  <View style={styles.warningTagRow}>
-                    {activeAnalysis.warning_tags.slice(0, 2).map((tag) => (
-                      <View key={tag} style={styles.warningTagChip}>
-                        <Text style={styles.warningTagText}>#{tag}</Text>
-                      </View>
-                    ))}
-                  </View>
-                ) : null}
-              </View>
-              {activeAnalysis.warning_text ? (
+            {hasWarning ? (
+              <View style={styles.warningCard}>
+                <View style={styles.warningHeader}>
+                  <Text style={styles.warningTitle}>주의 메시지</Text>
+                  {activeAnalysis.warning_tags?.length ? (
+                    <View style={styles.warningTagRow}>
+                      {activeAnalysis.warning_tags.slice(0, 2).map((tag) => (
+                        <View key={tag} style={styles.warningTagChip}>
+                          <Text style={styles.warningTagText}>#{tag}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  ) : null}
+                </View>
                 <Text style={styles.warningBody}>{activeAnalysis.warning_text}</Text>
-              ) : (
-                <Text style={styles.warningBody}>주의할 만한 메시지가 감지되지 않았어요.</Text>
-              )}
-              <View style={styles.warningChat}>
-                <View style={styles.chatHeaderRow}>
-                  <View style={styles.chatLabelPill}>
-                    <Text style={styles.chatLabelText}>내 대화</Text>
+                <View style={styles.warningChat}>
+                  <View style={styles.chatHeaderRow}>
+                    <View style={styles.chatLabelPill}>
+                      <Text style={styles.chatLabelText}>내 대화</Text>
+                    </View>
                   </View>
-                </View>
-                <View style={styles.chatBubbleGroup}>
-                  <View style={styles.chatBubbleLeft}>
-                    <Text style={styles.chatBubbleText}>
-                      정산 내용을 확인해주세요.{'\n'}골프{'\n'}
-                      {'\n'}-정산금액 : 120,000원{'\n'}-요청인원 : 6명{'\n'}-정산기한 : 2026.01.31.(토) 13:00까지
-                      {'\n'}
-                      {'\n'}20,000원을 송금해주세요.
-                    </Text>
-                    <View style={styles.chatTailLeft} />
+                  <View style={styles.chatBubbleGroup}>
+                    <View style={styles.chatBubbleLeft}>
+                      <Text style={styles.chatBubbleText}>
+                        정산 내용을 확인해주세요.{'\n'}골프{'\n'}
+                        {'\n'}-정산금액 : 120,000원{'\n'}-요청인원 : 6명{'\n'}-정산기한 : 2026.01.31.(토) 13:00까지
+                        {'\n'}
+                        {'\n'}20,000원을 송금해주세요.
+                      </Text>
+                      <View style={styles.chatTailLeft} />
+                    </View>
                   </View>
-                </View>
 
-                <View style={styles.chatDivider} />
+                  <View style={styles.chatDivider} />
 
-                <View style={styles.chatHeaderRow}>
-                  <View style={styles.chatLabelPillAlt}>
-                    <Text style={styles.chatLabelTextAlt}>유사 스캠 예시</Text>
+                  <View style={styles.chatHeaderRow}>
+                    <View style={styles.chatLabelPillAlt}>
+                      <Text style={styles.chatLabelTextAlt}>유사 스캠 예시</Text>
+                    </View>
                   </View>
-                </View>
-                <View style={styles.chatBubbleGroup}>
-                  <View style={styles.chatBubbleLeft}>
-                    <Text style={styles.chatBubbleTextAlt}>
-                      급하게 통관비를 내야 해서 오늘 안으로 송금 가능할까?
-                    </Text>
-                    <View style={styles.chatTailLeft} />
+                  <View style={styles.chatBubbleGroup}>
+                    <View style={styles.chatBubbleLeft}>
+                      <Text style={styles.chatBubbleTextAlt}>
+                        급하게 통관비를 내야 해서 오늘 안으로 송금 가능할까?
+                      </Text>
+                      <View style={styles.chatTailLeft} />
+                    </View>
                   </View>
                 </View>
               </View>
-            </View>
+            ) : null}
           </>
         ) : insightContent ? (
           <View style={styles.analysisCard}>{insightContent}</View>
@@ -519,41 +630,114 @@ const styles = StyleSheet.create({
     marginTop: 4,
     padding: 10,
     borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: '#eadfd7',
+    borderColor: '#e5e5e5',
+    gap: 8,
+  },
+  debugPanelHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     gap: 8,
   },
   debugLabel: {
     fontSize: 11,
-    color: '#7b6c62',
+    color: '#444444',
   },
-  debugInputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  debugLoadingText: {
+    fontSize: 12,
+    color: '#666666',
+  },
+  debugCalendarCard: {
+    padding: 10,
+    borderRadius: 14,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e5e5e5',
     gap: 8,
   },
-  debugInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#e1d6cf',
-    backgroundColor: '#fff',
-    borderRadius: 10,
+  debugMonthRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  debugMonthButton: {
     paddingHorizontal: 10,
     paddingVertical: 6,
-    fontSize: 12,
-    color: '#5f5147',
-  },
-  debugApplyButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 8,
     borderRadius: 10,
-    backgroundColor: '#d9c8be',
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#d9d9d9',
   },
-  debugApplyText: {
-    fontSize: 11,
+  debugMonthButtonDisabled: {
+    opacity: 0.4,
+  },
+  debugMonthButtonText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#111111',
+  },
+  debugMonthText: {
+    fontSize: 13,
     fontWeight: '700',
-    color: '#5f5147',
+    color: '#111111',
+  },
+  debugWeekRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 2,
+    paddingBottom: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e5e5',
+  },
+  debugWeekText: {
+    width: '14.28%',
+    textAlign: 'center',
+    fontSize: 9,
+    color: '#666666',
+  },
+  debugCalendarGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    rowGap: 8,
+    paddingTop: 6,
+  },
+  debugDayCell: {
+    width: '14.28%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    borderRadius: 12,
+  },
+  debugDayActive: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#d9d9d9',
+  },
+  debugDayDisabled: {
+    backgroundColor: 'transparent',
+    opacity: 0.35,
+  },
+  debugDaySelected: {
+    backgroundColor: '#111111',
+    borderColor: '#111111',
+  },
+  debugDayText: {
+    fontSize: 11,
+  },
+  debugDayTextActive: {
+    color: '#111111',
+  },
+  debugDayTextDisabled: {
+    color: '#c4c4c4',
+  },
+  debugDayTextSelected: {
+    color: '#ffffff',
+    fontWeight: '700',
+  },
+  debugDayEmpty: {
+    width: '14.28%',
   },
   debugResetButton: {
     paddingHorizontal: 10,

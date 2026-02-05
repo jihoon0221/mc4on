@@ -5,6 +5,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
+  Image,
   PanResponder,
   Pressable,
   SafeAreaView,
@@ -29,6 +30,7 @@ import { parseKakaoFile, type ParsedConversation } from '@/src/utils/kakaoImport
 const FEEDING_MS = 900;
 const FEED_CARD_SIZE = { width: 160, height: 64 };
 const ENABLE_UPLOAD_LOGS = typeof __DEV__ !== 'undefined' ? __DEV__ : true;
+const FEED_ICON = require('../../assets/images/kakao-talk.png');
 
 type ImportedFile = {
   uri: string;
@@ -607,17 +609,8 @@ export default function HomeScreen() {
                     opacity: feedOpacity,
                   },
                 ]}>
-                <View style={styles.feedMilletRow}>
-                  {Array.from({ length: 24 }).map((_, index) => (
-                    <View
-                      key={`millet-${index}`}
-                      style={[
-                        styles.feedMillet,
-                        index % 3 === 0 && styles.feedMilletSmall,
-                        index % 4 === 0 && styles.feedMilletAlt,
-                      ]}
-                    />
-                  ))}
+                <View style={styles.feedIconRow}>
+                  <Image source={FEED_ICON} style={styles.feedIcon} resizeMode="contain" />
                 </View>
               </Animated.View>
             ) : null}
@@ -781,16 +774,18 @@ const styles = StyleSheet.create({
     top: 0,
     width: FEED_CARD_SIZE.width,
     height: FEED_CARD_SIZE.height,
-    borderRadius: 18,
-    backgroundColor: '#fff6ee',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    borderRadius: 0,
+    backgroundColor: 'transparent',
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
     zIndex: 20,
     elevation: 8,
-    shadowColor: 'rgba(80, 64, 48, 0.2)',
-    shadowOpacity: 0.25,
-    shadowOffset: { width: 0, height: 6 },
-    shadowRadius: 10,
+    shadowColor: 'transparent',
+    shadowOpacity: 0,
+    shadowOffset: { width: 0, height: 0 },
+    shadowRadius: 0,
   },
   feedTopRow: {
     flexDirection: 'row',
@@ -802,28 +797,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#8a7b6f',
   },
-  feedMilletRow: {
-    flexDirection: 'row',
+  feedIconRow: {
+    flex: 1,
     alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 4,
     justifyContent: 'center',
-    marginTop: 2,
   },
-  feedMillet: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#d6b48e',
-  },
-  feedMilletSmall: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#caa87f',
-  },
-  feedMilletAlt: {
-    backgroundColor: '#e0c39a',
+  feedIcon: {
+    width: 52,
+    height: 52,
   },
   feedFile: {
     fontSize: 14,

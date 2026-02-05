@@ -150,6 +150,7 @@ const styles = StyleSheet.create({
   photoPlaceholder: {
     fontSize: 12,
     color: '#9a8a7d',
+    lineHeight: 18,
   },
   headerText: {
     flex: 1,
@@ -159,6 +160,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     color: '#4f4037',
+    lineHeight: 26,
   },
   pillRow: {
     flexDirection: 'row',
@@ -177,11 +179,13 @@ const styles = StyleSheet.create({
   pillLabel: {
     fontSize: 11,
     color: '#a3948a',
+    lineHeight: 16,
   },
   pillValue: {
     fontSize: 13,
     fontWeight: '600',
     color: '#5d4e45',
+    lineHeight: 20,
   },
   metaRow: {
     flexDirection: 'row',
@@ -198,11 +202,13 @@ const styles = StyleSheet.create({
   metaLabel: {
     fontSize: 11,
     color: '#a3948a',
+    lineHeight: 16,
   },
   metaValue: {
     fontSize: 14,
     fontWeight: '600',
     color: '#5d4e45',
+    lineHeight: 20,
   },
   storyCard: {
     padding: 12,
@@ -215,11 +221,12 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#a3948a',
     marginBottom: 4,
+    lineHeight: 16,
   },
   storyValue: {
     fontSize: 14,
     color: '#5d4e45',
-    lineHeight: 20,
+    lineHeight: 24,
   },
   emptyText: {
     fontSize: 12,

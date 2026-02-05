@@ -148,6 +148,7 @@ export default function TimelineScreen() {
   const [warningTarget, setWarningTarget] = useState<TimelineCardItem | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [warningOpen, setWarningOpen] = useState(false);
+  const openFlowSheet = () => setWarningOpen(true);
   const todayKey = useMemo(() => getSeoulDateKey(), []);
 
   const sortedRecords = useMemo(
@@ -264,19 +265,11 @@ export default function TimelineScreen() {
           <View style={styles.headerWrap}>
             <TopBar onPressSettings={() => setSettingsOpen(true)} />
 
-            <JourneyHeader activeIndex={stageIndex} birdState="healthy" onRewindPress={() => { /* TODO: rewind modal */ }} />
-
-            <Pressable style={styles.warningButton} onPress={() => setWarningOpen(true)} accessibilityRole="button">
-              <View style={styles.warningButtonLeft}>
-                <Ionicons name="alert-circle" size={16} color="#6c5f56" />
-                <Text style={styles.warningButtonText}>주의 흐름 살펴보기</Text>
-              </View>
-              <View style={styles.warningBadge}>
-                <Text style={styles.warningBadgeText}>
-                  {highSignalToday ? '오늘 강한 신호' : `최근 7일 ${last7Count}개 신호`}
-                </Text>
-              </View>
-            </Pressable>
+            <JourneyHeader
+              activeIndex={stageIndex}
+              birdState="healthy"
+              onRewindPress={openFlowSheet}
+            />
 
             <FilterChips selected={filter} onSelect={setFilter} />
           </View>
@@ -361,35 +354,6 @@ const styles = StyleSheet.create({
   headerWrap: {
     gap: 16,
     paddingBottom: 8,
-  },
-  warningButton: {
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.72)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  warningButtonLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  warningButtonText: {
-    fontSize: 13,
-    color: '#5d4e45',
-    fontWeight: '600',
-  },
-  warningBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 10,
-    backgroundColor: 'rgba(215, 191, 176, 0.5)',
-  },
-  warningBadgeText: {
-    fontSize: 11,
-    color: '#6d5f55',
   },
   headerTop: {
     flexDirection: 'row',
