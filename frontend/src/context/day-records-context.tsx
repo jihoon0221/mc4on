@@ -11,6 +11,7 @@ type DayRecordsContextValue = {
   addOrUpdateToday: (input: CreateTodayRecordInput) => Promise<DayRecord>;
   markLearnedToday: (birdState?: BirdState) => Promise<DayRecord | null>;
   markImmediateRiskShown: (dateKey: string) => Promise<DayRecord | null>;
+  replaceAll: (nextRecords: DayRecord[]) => Promise<void>;
   reload: () => Promise<void>;
 };
 
@@ -151,6 +152,10 @@ export function DayRecordsProvider({ children }: { children: React.ReactNode }) 
       addOrUpdateToday,
       markLearnedToday,
       markImmediateRiskShown,
+      replaceAll: async (nextRecords: DayRecord[]) => {
+        setRecords(nextRecords);
+        await saveDayRecords(nextRecords);
+      },
       reload,
     }),
     [records, isLoading, addOrUpdateToday, markLearnedToday, markImmediateRiskShown, reload]

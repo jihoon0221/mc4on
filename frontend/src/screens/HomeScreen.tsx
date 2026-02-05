@@ -172,7 +172,7 @@ export default function HomeScreen() {
   const [importMessage, setImportMessage] = useState('');
   const [importError, setImportError] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const { addOrUpdateToday, records } = useDayRecords();
+  const { addOrUpdateToday, records, replaceAll } = useDayRecords();
 
   const eggCrack = useRef(new Animated.Value(0)).current;
   const eggOverlayScale = useRef(new Animated.Value(0.9)).current;
@@ -448,6 +448,7 @@ export default function HomeScreen() {
       });
 
       let analysisResult: AnalysisResult | undefined;
+      let replacedAll = false;
       try {
         logUpload('send_to_server', {
           baseUrl: API_BASE_URL,
@@ -465,7 +466,12 @@ export default function HomeScreen() {
           syncAnalysis: true,
           force: true,
         });
-        const rawItems = response.analysis_result?.learning_items ?? [];
+        const fallbackResult =
+          response.analysis_result ??
+          (response.dailyreport && response.dailyreport.length > 0
+            ? response.dailyreport[response.dailyreport.length - 1]
+            : null);
+        const rawItems = fallbackResult?.learning_items ?? [];
         const jobId = response.analysis_job_id ?? null;
         const jobDate = response.analysis_jobs?.[0]?.analysis_date ?? null;
         const itemSchema = rawItems.length
@@ -484,7 +490,7 @@ export default function HomeScreen() {
           summaryTextPreview: response.analysis_result?.summary_text?.slice(0, 120) ?? null,
           warningTextPreview: response.analysis_result?.warning_text?.slice(0, 120) ?? null,
         });
-        analysisResult = normalizeAnalysisResult(response.analysis_result);
+        analysisResult = normalizeAnalysisResult(fallbackResult as KakaoUploadResponse['analysis_result']);
 
         if (response.timeline && response.timeline.length > 0) {
           const mapped = mapTimelineResponseToEntries(response.timeline);
@@ -494,6 +500,35 @@ export default function HomeScreen() {
           if (serverTimeline.length > 0) {
             await saveTimelineEntries(serverTimeline);
           }
+        }
+
+        if (response.dailyreport && response.dailyreport.length > 0) {
+          const now = new Date().toISOString();
+          const replaced = response.dailyreport.map((item) => {
+            const normalized = normalizeAnalysisResult(item);
+            return {
+              id: `day_${item.analysis_date}`,
+              date: item.analysis_date,
+              source: 'kakaotalk_txt' as const,
+              sourceFileName: file.name,
+              extractedSentences: normalized?.learning_items?.map((learn) => learn.content_kr).filter(Boolean).slice(0, 3) ?? [],
+              nativeSentences: normalized?.learning_items?.map((learn) => learn.content_fl).filter(Boolean) ?? [],
+              flags: parsed.flags,
+              uploadCount: 1,
+              learned: false,
+              immediateRisk: {
+                scamUrl: false,
+                reportedAccount: false,
+                aiImage: false,
+              },
+              immediateRiskShown: false,
+              analysisResult: normalized ?? undefined,
+              createdAt: now,
+              updatedAt: now,
+            };
+          });
+          await replaceAll(replaced);
+          replacedAll = true;
         }
 
         if (!analysisResult && jobId) {
@@ -555,14 +590,24 @@ export default function HomeScreen() {
         setImportError(message ? `분석 서버 연결에 실패했어요: ${message}` : '분석 서버 연결에 실패했어요.');
       }
 
-      const updated = await addOrUpdateToday({
-        extractedSentences: parsed.messages.slice(0, 3),
-        nativeSentences: undefined,
-        flags: parsed.flags,
-        sourceFileName: file.name,
-        analysisResult,
-      });
-      if (updated) {
+      if (!replacedAll) {
+        const updated = await addOrUpdateToday({
+          extractedSentences: parsed.messages.slice(0, 3),
+          nativeSentences: undefined,
+          flags: parsed.flags,
+          sourceFileName: file.name,
+          analysisResult,
+        });
+        if (updated) {
+          setFeedReady(true);
+          setFeedVisible(true);
+          setFeedConsumed(false);
+          setEggReady(false);
+          feedScale.setValue(1);
+          feedOpacity.setValue(1);
+          setImportMessage('오늘의 먹이가 준비됐어요. 새에게 먹여볼까요?');
+        }
+      } else {
         setFeedReady(true);
         setFeedVisible(true);
         setFeedConsumed(false);
@@ -946,4 +991,3 @@ const styles = StyleSheet.create({
     width: 78,
   },
 });
-

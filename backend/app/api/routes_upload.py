@@ -79,6 +79,10 @@ def upload(
 ) -> dict[str, object]:
     convo = _get_or_create_conversation(db, current_user.id)
 
+    mock_payload = _build_mock_response(text, convo.id)
+    if mock_payload is not None:
+        return mock_payload
+
     raw_file_path = None
     raw_file_sha256 = None
     if file is not None:

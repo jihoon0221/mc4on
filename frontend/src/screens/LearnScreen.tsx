@@ -108,7 +108,8 @@ export default function LearnScreen({
   );
   const analysis = (analysisResult ?? todayRecord?.analysisResult ?? null) as AnalysisResult | null;
   const [analysisOverride, setAnalysisOverride] = useState<AnalysisResult | null>(null);
-  const activeAnalysis = analysisOverride ?? analysis;
+  // Always prefer the latest analysis from upload/day record; use debug override only if no analysis exists.
+  const activeAnalysis = analysis ?? analysisOverride;
   const showDebug = typeof __DEV__ !== 'undefined' && __DEV__;
   const [debugOpen, setDebugOpen] = useState(false);
   const [debugDate, setDebugDate] = useState('');
