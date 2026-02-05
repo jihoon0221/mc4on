@@ -489,6 +489,8 @@ export default function HomeScreen() {
           learningItemsCount: rawItems.length,
           summaryTextPreview: response.analysis_result?.summary_text?.slice(0, 120) ?? null,
           warningTextPreview: response.analysis_result?.warning_text?.slice(0, 120) ?? null,
+          mockUsed: response.mock_used ?? false,
+          mockKeyword: response.mock_keyword ?? null,
         });
         analysisResult = normalizeAnalysisResult(fallbackResult as KakaoUploadResponse['analysis_result']);
 

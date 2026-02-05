@@ -81,6 +81,14 @@ def upload(
 
     mock_payload = _build_mock_response(text, convo.id)
     if mock_payload is not None:
+        logger.info(
+            "mock_response_used",
+            extra={
+                "conversation_id": str(convo.id),
+                "upload_date": (upload_date or date.today()).isoformat(),
+                "keyword": "신지훈" if "신지훈" in text else "Daniel" if "daniel" in text.lower() else "unknown",
+            },
+        )
         return mock_payload
 
     raw_file_path = None
@@ -226,6 +234,14 @@ def upload_kakao(
 
     mock_payload = _build_mock_response(text, convo.id)
     if mock_payload is not None:
+        logger.info(
+            "mock_response_used",
+            extra={
+                "conversation_id": str(convo.id),
+                "upload_date": date.today().isoformat(),
+                "keyword": "신지훈" if "신지훈" in text else "Daniel" if "daniel" in text.lower() else "unknown",
+            },
+        )
         return mock_payload
 
     photo_dates, photo_flags = _ingest_photos(
@@ -496,8 +512,10 @@ def _build_mock_response(text: str, conversation_id: uuid.UUID) -> dict[str, obj
     lowered = text.lower()
     if "신지훈" in text:
         path = _MOCK_JIHOON_PATH
+        keyword = "신지훈"
     elif "daniel" in lowered:
         path = _MOCK_DANIEL_PATH
+        keyword = "Daniel"
     else:
         return None
     try:
@@ -556,6 +574,8 @@ def _build_mock_response(text: str, conversation_id: uuid.UUID) -> dict[str, obj
         "analysis_result": analysis_result,
         "timeline": timeline,
         "dailyreport": dailyreport_sorted,
+        "mock_used": True,
+        "mock_keyword": keyword,
     }
 
 

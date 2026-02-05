@@ -34,6 +34,8 @@ export type KakaoUploadResponse = {
     bird_state: number;
   }>;
   dailyreport?: Array<Omit<AnalysisResult, 'learning_items'> & { learning_items?: LearningItemResponse[] }>;
+  mock_used?: boolean;
+  mock_keyword?: string;
 };
 
 type KakaoUploadInput = {
