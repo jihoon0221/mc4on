@@ -3,8 +3,10 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { QUIZ_V1, type QuizBundle, type QuizQuestion } from '@/src/data/quiz_v1';
-import { getQuizVersion } from '@/src/storage/debug-settings';
+import { QUIZ_V2 } from '@/src/data/quiz_v2';
+import { getDebugV2Day, getQuizVersion } from '@/src/storage/debug-settings';
 import { getSeoulDateKey } from '@/src/utils/date';
+import { mapWarningTags } from '@/src/utils/warning-tags';
 
 const QUIZ_TYPES = {
   word: '단어 퀴즈',
@@ -17,7 +19,8 @@ function pickBundle(version: number, date?: string): QuizBundle | null {
   if (version === 1) {
     return QUIZ_V1.find((item) => item.date === target) ?? QUIZ_V1[QUIZ_V1.length - 1] ?? null;
   }
-  return QUIZ_V1.find((item) => item.date === target) ?? QUIZ_V1[QUIZ_V1.length - 1] ?? null;
+  const v2Target = date ?? QUIZ_V2[QUIZ_V2.length - 1]?.date;
+  return QUIZ_V2.find((item) => item.date === v2Target) ?? QUIZ_V2[QUIZ_V2.length - 1] ?? null;
 }
 
 export default function QuizScreen() {
@@ -27,6 +30,7 @@ export default function QuizScreen() {
   const targetDate = params.date ?? todayKey;
 
   const [quizVersion, setQuizVersion] = useState(1);
+  const [debugV2Date, setDebugV2Date] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -37,7 +41,24 @@ export default function QuizScreen() {
       cancelled = true;
     };
   }, []);
-  const bundle = useMemo(() => pickBundle(quizVersion, targetDate), [quizVersion, targetDate]);
+  useEffect(() => {
+    let cancelled = false;
+    if (quizVersion !== 2) {
+      setDebugV2Date(null);
+      return () => {
+        cancelled = true;
+      };
+    }
+    (async () => {
+      const date = await getDebugV2Day();
+      if (!cancelled) setDebugV2Date(date);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [quizVersion]);
+  const resolvedDate = quizVersion === 2 ? debugV2Date ?? targetDate : targetDate;
+  const bundle = useMemo(() => pickBundle(quizVersion, resolvedDate), [quizVersion, resolvedDate]);
   const quizzes = bundle?.quizzes ?? [];
   const summary = bundle?.summary;
 
@@ -236,7 +257,7 @@ export default function QuizScreen() {
                 ) : null}
                 {summary?.warning_tags?.length ? (
                   <View style={styles.tagRow}>
-                    {summary.warning_tags.map((tag) => (
+                    {mapWarningTags(summary.warning_tags).map((tag) => (
                       <View key={tag} style={styles.warningChip}>
                         <Text style={styles.warningChipText}>#{tag}</Text>
                       </View>

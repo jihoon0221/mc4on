@@ -3,6 +3,8 @@ import React, { useMemo, useState } from 'react';
 import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { useDayRecords } from '@/src/context/day-records-context';
+import { useTimeline } from '@/src/context/timeline-context';
+import { mapWarningTags } from '@/src/utils/warning-tags';
 
 const FLAG_ROWS = [
   { key: 'moneyRequest', label: '금전 요청' },
@@ -30,11 +32,19 @@ export default function TimelineDetailScreen() {
   const router = useRouter();
   const { id } = useGlobalSearchParams<{ id?: string }>();
   const { records, markImmediateRiskShown } = useDayRecords();
+  const { entries } = useTimeline();
   const [showOverlay, setShowOverlay] = useState(false);
 
-  const record = useMemo(
-    () => records.find((item) => item.id === id),
-    [records, id]
+  const record = useMemo(() => {
+    if (!id) return undefined;
+    const direct = records.find((item) => item.id === id);
+    if (direct) return direct;
+    const dateMatch = records.find((item) => item.date === id);
+    return dateMatch;
+  }, [records, id]);
+  const entry = useMemo(
+    () => entries.find((item) => item.id === id || item.date === id),
+    [entries, id]
   );
 
   const nativeSentences = record?.nativeSentences ?? [];
@@ -43,7 +53,14 @@ export default function TimelineDetailScreen() {
     return '번역이 없어요.';
   };
 
-  const tags = useMemo(() => (record ? buildTags(record.flags) : []), [record]);
+  const tags = useMemo(() => {
+    if (entry?.tags?.length) return entry.tags.map((tag) => (tag.startsWith('#') ? tag : `#${tag}`));
+    return record ? buildTags(record.flags) : [];
+  }, [entry, record]);
+
+  const warningText = entry?.warningText ?? record?.analysisResult?.warning_text ?? null;
+  const warningTags = entry?.warningTags ?? record?.analysisResult?.warning_tags ?? [];
+  const hasWarning = Boolean(warningText) || warningTags.length > 0;
 
   const riskLabels = useMemo(() => {
     if (!record?.immediateRisk) return [];
@@ -82,7 +99,7 @@ export default function TimelineDetailScreen() {
     router.push('/(tabs)/profile/report');
   };
 
-  if (!record) {
+  if (!record && !entry) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.emptyWrap}>
@@ -107,12 +124,18 @@ export default function TimelineDetailScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>오늘의 학습</Text>
           <View style={styles.cards}>
-            {record.extractedSentences.map((sentence, index) => (
-              <View key={`${sentence}-${index}`} style={styles.card}>
-                <Text style={styles.cardKorean}>{sentence}</Text>
-                <Text style={styles.cardNative}>{translate(sentence, index)}</Text>
+            {record?.extractedSentences?.length ? (
+              record.extractedSentences.map((sentence, index) => (
+                <View key={`${sentence}-${index}`} style={styles.card}>
+                  <Text style={styles.cardKorean}>{sentence}</Text>
+                  <Text style={styles.cardNative}>{translate(sentence, index)}</Text>
+                </View>
+              ))
+            ) : (
+              <View style={styles.card}>
+                <Text style={styles.cardKorean}>학습 기록이 없어요.</Text>
               </View>
-            ))}
+            )}
           </View>
         </View>
 
@@ -127,17 +150,24 @@ export default function TimelineDetailScreen() {
           </View>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>주의 흐름</Text>
-          <View style={styles.flags}>
-            {FLAG_ROWS.map((flag) => (
-              <View key={flag.key} style={styles.flagRow}>
-                <Text style={styles.flagLabel}>{flag.label}</Text>
-                <Text style={styles.flagValue}>{record.flags[flag.key] ? '있음' : '없음'}</Text>
+        {hasWarning ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>경고</Text>
+            {warningText ? <Text style={styles.warningText}>{warningText}</Text> : null}
+            {warningTags.length > 0 ? (
+              <View style={styles.tagRow}>
+                {mapWarningTags(warningTags).map((tag) => {
+                  const label = tag.startsWith('#') ? tag : `#${tag}`;
+                  return (
+                    <View key={label} style={styles.tagChip}>
+                      <Text style={styles.tagText}>{label}</Text>
+                    </View>
+                  );
+                })}
               </View>
-            ))}
+            ) : null}
           </View>
-        </View>
+        ) : null}
 
         {record.immediateRisk && riskLabels.length > 0 ? (
           <View style={styles.riskBox}>
@@ -219,6 +249,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: '#6f6258',
+  },
+  warningText: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#5f5147',
   },
   cards: {
     gap: 10,

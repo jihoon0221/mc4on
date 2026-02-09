@@ -99,6 +99,12 @@ function logUpload(label: string, data: Record<string, unknown>) {
   console.log(`[upload] ${label}`, data);
 }
 
+function logTimeline(label: string, data: Record<string, unknown>) {
+  if (!ENABLE_UPLOAD_LOGS) return;
+  // eslint-disable-next-line no-console
+  console.log(`[timeline] ${label}`, data);
+}
+
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -185,7 +191,7 @@ export default function HomeScreen() {
   const [importError, setImportError] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const { addOrUpdateToday, records, replaceAll } = useDayRecords();
-  const { addEntry, reload: reloadTimeline } = useTimeline();
+  const { addEntry, replaceEntries, reload: reloadTimeline } = useTimeline();
 
   const eggCrack = useRef(new Animated.Value(0)).current;
   const eggOverlayScale = useRef(new Animated.Value(0.9)).current;
@@ -556,24 +562,31 @@ export default function HomeScreen() {
 
         if (response.timeline && response.timeline.length > 0) {
           const mapped = mapTimelineResponseToEntries(response.timeline);
+          logTimeline('mapped_entries', {
+            version,
+            count: mapped.length,
+            dates: mapped.map((item) => item.date),
+          });
           if (version === 2) {
             const nextEntry = mapped[0];
             if (nextEntry) {
+              logTimeline('add_entry', { id: nextEntry.id, date: nextEntry.date });
               await addEntry(nextEntry);
             }
           } else {
-            await saveTimelineEntries(mapped);
-            await reloadTimeline();
+            logTimeline('save_entries', { count: mapped.length });
+            await replaceEntries(mapped);
           }
         } else if (!forceReplace && version !== 2) {
+          logTimeline('timeline_empty_from_response', { version });
           const serverTimeline = await fetchTimelineEntries();
           if (serverTimeline.length > 0) {
-            await saveTimelineEntries(serverTimeline);
-            await reloadTimeline();
+            logTimeline('save_server_timeline', { count: serverTimeline.length });
+            await replaceEntries(serverTimeline);
           }
         } else if (forceReplace) {
-          await saveTimelineEntries([]);
-          await reloadTimeline();
+          logTimeline('force_replace_clear', { version });
+          await replaceEntries([]);
         }
 
         if (response.dailyreport && response.dailyreport.length > 0) {

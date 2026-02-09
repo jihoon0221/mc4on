@@ -7,6 +7,7 @@ type TimelineContextValue = {
   entries: TimelineEntry[];
   isLoading: boolean;
   addEntry: (entry: TimelineEntry) => Promise<void>;
+  replaceEntries: (entries: TimelineEntry[]) => Promise<void>;
   reload: () => Promise<void>;
 };
 
@@ -36,14 +37,20 @@ export function TimelineProvider({ children }: { children: React.ReactNode }) {
     [entries]
   );
 
+  const replaceEntries = useCallback(async (next: TimelineEntry[]) => {
+    setEntries(next);
+    await saveTimelineEntries(next);
+  }, []);
+
   const value = useMemo(
     () => ({
       entries,
       isLoading,
       addEntry,
+      replaceEntries,
       reload,
     }),
-    [entries, isLoading, addEntry, reload]
+    [entries, isLoading, addEntry, replaceEntries, reload]
   );
 
   return <TimelineContext.Provider value={value}>{children}</TimelineContext.Provider>;

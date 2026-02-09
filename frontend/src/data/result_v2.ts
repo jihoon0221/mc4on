@@ -1,4 +1,5 @@
 import type { AnalysisResult } from '@/src/models/analysis-result';
+import type { BirdState } from '@/src/models/bird-state';
 import type { TimelineEntry } from '@/src/models/timeline-entry';
 import { QUIZ_V2 } from './quiz_v2';
 import type { QuizBundle } from './quiz_v1';
@@ -28,6 +29,14 @@ export type V2Result = {
   dailyreport: V2DailyReport[];
 };
 
+function birdStateFromRiskLevel(level?: number | null): BirdState {
+  const value = level ?? 0;
+  if (value >= 4) return 'anxious';
+  if (value >= 3) return 'anxious';
+  if (value >= 2) return 'cautious';
+  return 'calm';
+}
+
 function buildLearningItems(bundle: QuizBundle) {
   return bundle.quizzes.map((quiz) => {
     if (quiz.type === 'sentence_order') {
@@ -44,14 +53,14 @@ function buildLearningItems(bundle: QuizBundle) {
 }
 
 export function buildV2Result(): V2Result {
-  const timeline = QUIZ_V2.map((bundle, index) => ({
+  const timeline = QUIZ_V2.map((bundle) => ({
     analysis_date: bundle.date,
     summary_short: bundle.summary.summary_text,
     tags: bundle.summary.tags,
     warning_text: bundle.summary.warning_text ?? null,
     warning_tags: bundle.summary.warning_tags ?? [],
     risk_level: bundle.summary.risk_level ?? null,
-    bird_state: bundle.summary.risk_level ?? index + 1,
+    bird_state: bundle.summary.risk_level ?? 0,
   }));
 
   const dailyreport = QUIZ_V2.map((bundle) => ({
@@ -69,8 +78,20 @@ export function buildV2Result(): V2Result {
 
 export function pickNextV2Bundle(existingDates: string[]): QuizBundle | null {
   if (QUIZ_V2.length === 0) return null;
-  const existing = new Set(existingDates);
-  return QUIZ_V2.find((bundle) => !existing.has(bundle.date)) ?? QUIZ_V2[QUIZ_V2.length - 1];
+  for (let i = 0; i < QUIZ_V2.length; i += 1) {
+    const bundle = QUIZ_V2[i];
+    let found = false;
+    for (let j = 0; j < existingDates.length; j += 1) {
+      if (existingDates[j] === bundle.date) {
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      return bundle;
+    }
+  }
+  return QUIZ_V2[QUIZ_V2.length - 1];
 }
 
 export function buildV2AnalysisResult(bundle: QuizBundle): AnalysisResult {
@@ -99,7 +120,7 @@ export function buildV2TimelineEntry(bundle: QuizBundle): TimelineEntry {
     warningText: bundle.summary.warning_text ?? null,
     warningTags: bundle.summary.warning_tags ?? [],
     riskLevel: bundle.summary.risk_level ?? null,
-    birdState: 'healthy',
+    birdState: birdStateFromRiskLevel(bundle.summary.risk_level),
     createdAt: new Date().toISOString(),
   };
 }

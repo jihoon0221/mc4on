@@ -59,17 +59,27 @@ export default function TimelineScreen() {
   const todayKey = useMemo(() => getSeoulDateKey(), []);
 
   const sortedRecords = useMemo(() => [...entries].sort((a, b) => b.date.localeCompare(a.date)), [entries]);
+  const dayIndexByDate = useMemo(() => {
+    const ascending = [...entries].sort((a, b) => a.date.localeCompare(b.date));
+    const map = new Map<string, number>();
+    ascending.forEach((record, index) => {
+      map.set(record.date, index + 1);
+    });
+    return map;
+  }, [entries]);
 
   const items = useMemo(() => {
     if (sortedRecords.length === 0) return EMPTY_ITEMS;
     return sortedRecords.map((record, index) => {
       const tags = ensureHashTags(record.tags ?? []);
       const isToday = record.date === todayKey;
-      const groupLabel = isToday ? '오늘' : `Day ${index + 1}`;
+      const dayIndex = dayIndexByDate.get(record.date) ?? index + 1;
+      const groupLabel = isToday ? '오늘' : `Day ${dayIndex}`;
       const title = record.summary || '오늘의 기록';
       const subtitle = '';
       const hasWarning = Boolean(record.warningText) || (record.warningTags?.length ?? 0) > 0;
 
+      const visualBirdState = mapBirdState(record.birdState);
       return {
         id: record.id ?? record.date,
         groupLabel,
@@ -78,7 +88,7 @@ export default function TimelineScreen() {
         subtitle,
         tags,
         status: 'pending',
-        birdState: record.birdState ?? 'healthy',
+        birdState: visualBirdState,
         __meta: {
           rawTags: [...(record.tags ?? []), ...(record.warningTags ?? [])].join(' '),
           riskLevel: record.riskLevel ?? null,
