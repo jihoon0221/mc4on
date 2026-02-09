@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import type { TimelineEntry } from '@/src/models/timeline-entry';
 
-const TIMELINE_KEY = 'birdguard.timeline_entries.v1';
+export const TIMELINE_KEY = 'birdguard.timeline_entries.v1';
 
 export async function loadTimelineEntries(): Promise<TimelineEntry[]> {
   try {

@@ -1,15 +1,15 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useGlobalSearchParams, useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { useDayRecords } from '@/src/context/day-records-context';
 
 const FLAG_ROWS = [
-  { key: 'moneyRequest', label: '±›¿¸ ∞¸∑√ «•«ˆ' },
-  { key: 'favorRequest', label: '∫Œ≈π/µµøÚ ø‰√ª' },
-  { key: 'excessivePraise', label: '∞˙«— ƒ™¬˘/¿«¡∏' },
-  { key: 'linkIncluded', label: 'ø‹∫Œ ∏µ≈© ∆˜«‘' },
-  { key: 'imageIncluded', label: '¿ÃπÃ¡ˆ ∆˜«‘' },
+  { key: 'moneyRequest', label: 'Í∏àÏ†Ñ ÏöîÏ≤≠' },
+  { key: 'favorRequest', label: 'Î∂ÄÌÉÅ' },
+  { key: 'excessivePraise', label: 'Í≥ºÌïú Ïπ≠Ï∞¨' },
+  { key: 'linkIncluded', label: 'ÎßÅÌÅ¨ Ìè¨Ìï®' },
+  { key: 'imageIncluded', label: 'Ïù¥ÎØ∏ÏßÄ Ìè¨Ìï®' },
 ] as const;
 
 function formatDate(date: string) {
@@ -18,17 +18,17 @@ function formatDate(date: string) {
 
 function buildTags(flags: Record<string, boolean>) {
   const tags: string[] = [];
-  if (flags.moneyRequest) tags.push('#±›¿¸æ±ﬁ');
-  if (flags.favorRequest) tags.push('#∫Œ¥„∞®¡∂º∫');
-  if (flags.excessivePraise) tags.push('#Ω≈∑⁄∞≠¡∂');
-  if (flags.linkIncluded) tags.push('#∏µ≈©∆˜«‘');
-  if (flags.imageIncluded) tags.push('#¿ÃπÃ¡ˆ∆˜«‘');
-  return tags.length > 0 ? tags : ['#¿œªÛ¥Î»≠'];
+  if (flags.moneyRequest) tags.push('#Í∏àÏ†Ñ');
+  if (flags.favorRequest) tags.push('#Î∂ÄÌÉÅ');
+  if (flags.excessivePraise) tags.push('#Í≥ºÌïúÏπ≠Ï∞¨');
+  if (flags.linkIncluded) tags.push('#ÎßÅÌÅ¨');
+  if (flags.imageIncluded) tags.push('#Ïù¥ÎØ∏ÏßÄ');
+  return tags.length > 0 ? tags : ['#ÏùºÏÉÅ'];
 }
 
 export default function TimelineDetailScreen() {
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id?: string }>();
+  const { id } = useGlobalSearchParams<{ id?: string }>();
   const { records, markImmediateRiskShown } = useDayRecords();
   const [showOverlay, setShowOverlay] = useState(false);
 
@@ -40,7 +40,7 @@ export default function TimelineDetailScreen() {
   const nativeSentences = record?.nativeSentences ?? [];
   const translate = (sentence: string, index: number) => {
     if (nativeSentences[index]) return nativeSentences[index];
-    return '(π¯ø™ ¡ÿ∫Ò¡ﬂ)';
+    return 'Î≤àÏó≠Ïù¥ ÏóÜÏñ¥Ïöî.';
   };
 
   const tags = useMemo(() => (record ? buildTags(record.flags) : []), [record]);
@@ -48,9 +48,9 @@ export default function TimelineDetailScreen() {
   const riskLabels = useMemo(() => {
     if (!record?.immediateRisk) return [];
     return [
-      record.immediateRisk.scamUrl ? 'Ω≈∞Ìµ» ∏µ≈©' : null,
-      record.immediateRisk.reportedAccount ? 'Ω≈∞Ìµ» ∞Ë¡¬' : null,
-      record.immediateRisk.aiImage ? '«’º∫ ¿ÃπÃ¡ˆ' : null,
+      record.immediateRisk.scamUrl ? 'ÏùòÏã¨ ÎßÅÌÅ¨ Í∞êÏßÄ' : null,
+      record.immediateRisk.reportedAccount ? 'Ïã†Í≥†Îêú Í≥ÑÏ¢å' : null,
+      record.immediateRisk.aiImage ? 'AI Ïù¥ÎØ∏ÏßÄ ÏùòÏã¨' : null,
     ].filter(Boolean) as string[];
   }, [record]);
 
@@ -86,9 +86,9 @@ export default function TimelineDetailScreen() {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.emptyWrap}>
-          <Text style={styles.emptyTitle}>«ÿ¥Á ≥Ø¬•¿« ±‚∑œ¿Ã æ¯æÓø‰</Text>
+          <Text style={styles.emptyTitle}>Í∏∞Î°ùÏùÑ Ï∞æÏßÄ Î™ªÌñàÏñ¥Ïöî.</Text>
           <Pressable style={styles.homeButton} onPress={() => router.back()}>
-            <Text style={styles.homeButtonText}>µ⁄∑Œ</Text>
+            <Text style={styles.homeButtonText}>Îí§Î°ú</Text>
           </Pressable>
         </View>
       </SafeAreaView>
@@ -99,13 +99,13 @@ export default function TimelineDetailScreen() {
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
         <Pressable style={styles.backButton} onPress={() => router.back()}>
-          <Text style={styles.backText}>µ⁄∑Œ</Text>
+          <Text style={styles.backText}>Îí§Î°ú</Text>
         </Pressable>
 
         <Text style={styles.title}>{formatDate(record.date)}</Text>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>ø¿¥√¿« πÆ¿Â</Text>
+          <Text style={styles.sectionTitle}>Ïò§ÎäòÏùò ÌïôÏäµ</Text>
           <View style={styles.cards}>
             {record.extractedSentences.map((sentence, index) => (
               <View key={`${sentence}-${index}`} style={styles.card}>
@@ -117,7 +117,7 @@ export default function TimelineDetailScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>ø¿¥√¿« ≈¬±◊</Text>
+          <Text style={styles.sectionTitle}>ÌÉúÍ∑∏</Text>
           <View style={styles.tagRow}>
             {tags.map((tag) => (
               <View key={tag} style={styles.tagChip}>
@@ -128,12 +128,12 @@ export default function TimelineDetailScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>ø¿¥√¿« √º≈©</Text>
+          <Text style={styles.sectionTitle}>Ï£ºÏùò ÌùêÎ¶Ñ</Text>
           <View style={styles.flags}>
             {FLAG_ROWS.map((flag) => (
               <View key={flag.key} style={styles.flagRow}>
                 <Text style={styles.flagLabel}>{flag.label}</Text>
-                <Text style={styles.flagValue}>{record.flags[flag.key] ? '¿÷¿Ω' : 'æ¯¿Ω'}</Text>
+                <Text style={styles.flagValue}>{record.flags[flag.key] ? 'ÏûàÏùå' : 'ÏóÜÏùå'}</Text>
               </View>
             ))}
           </View>
@@ -141,14 +141,14 @@ export default function TimelineDetailScreen() {
 
         {record.immediateRisk && riskLabels.length > 0 ? (
           <View style={styles.riskBox}>
-            <Text style={styles.riskTitle}>¿ÃπÃ Ω≈∞Ìµ» ¡§∫∏</Text>
+            <Text style={styles.riskTitle}>Ï¶âÏãú ÏúÑÌóò Ïã†Ìò∏</Text>
             {riskLabels.map((label) => (
               <Text key={label} style={styles.riskItem}>
                 {label}
               </Text>
             ))}
             <Pressable style={styles.riskButton} onPress={() => router.push('/(tabs)/profile/report')}>
-              <Text style={styles.riskButtonText}>Report∑Œ ¿Ãµø</Text>
+              <Text style={styles.riskButtonText}>Ïã†Í≥†ÌïòÍ∏∞</Text>
             </Pressable>
           </View>
         ) : null}
@@ -156,14 +156,14 @@ export default function TimelineDetailScreen() {
 
       <View style={styles.footer}>
         <Pressable style={styles.ctaButton} onPress={() => router.push('/(tabs)/profile')}>
-          <Text style={styles.ctaText}>µµøÚ¿Ã « ø‰«“±Óø‰?</Text>
+          <Text style={styles.ctaText}>ÌîÑÎ°úÌïÑÎ°ú Ïù¥Îèô</Text>
         </Pressable>
       </View>
 
       {showOverlay ? (
         <View style={styles.overlay}>
           <View style={styles.overlayCard}>
-            <Text style={styles.overlayTitle}>¿ÃπÃ Ω≈∞Ìµ» ªÁ±‚ ¡§∫∏¿‘¥œ¥Ÿ.</Text>
+            <Text style={styles.overlayTitle}>Ï£ºÏùòÍ∞Ä ÌïÑÏöîÌïú Ïã†Ìò∏Í∞Ä Î≥¥Ïó¨Ïöî.</Text>
             <View style={styles.overlayList}>
               {riskLabels.map((label) => (
                 <Text key={label} style={styles.overlayItem}>
@@ -173,10 +173,10 @@ export default function TimelineDetailScreen() {
             </View>
             <View style={styles.overlayActions}>
               <Pressable style={styles.overlayButtonGhost} onPress={() => void handleDismiss()}>
-                <Text style={styles.overlayGhostText}>¥›±‚</Text>
+                <Text style={styles.overlayGhostText}>ÎÇòÏ§ëÏóê</Text>
               </Pressable>
               <Pressable style={styles.overlayButton} onPress={() => void handleReport()}>
-                <Text style={styles.overlayButtonText}>Report∑Œ ¿Ãµø</Text>
+                <Text style={styles.overlayButtonText}>Ïã†Í≥†ÌïòÍ∏∞</Text>
               </Pressable>
             </View>
           </View>
@@ -198,206 +198,198 @@ const styles = StyleSheet.create({
   },
   backButton: {
     alignSelf: 'flex-start',
+    paddingHorizontal: 12,
     paddingVertical: 6,
-    paddingHorizontal: 10,
     borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.6)',
+    backgroundColor: '#f2e6df',
   },
   backText: {
     fontSize: 12,
-    color: '#7b6c62',
+    color: '#6b5b52',
   },
   title: {
-    fontSize: 26,
+    fontSize: 20,
     fontWeight: '700',
     color: '#5f5147',
-    marginBottom: 4,
   },
   section: {
     gap: 10,
   },
   sectionTitle: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#6e5f54',
+    fontWeight: '700',
+    color: '#6f6258',
   },
   cards: {
-    gap: 12,
+    gap: 10,
   },
   card: {
-    borderRadius: 18,
-    backgroundColor: '#f7eeea',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    padding: 12,
+    borderRadius: 14,
+    backgroundColor: '#fff7f3',
+    borderWidth: 1,
+    borderColor: '#efe1d9',
   },
   cardKorean: {
-    fontSize: 16,
-    lineHeight: 22,
-    color: '#5c4e44',
-    marginBottom: 8,
+    fontSize: 14,
+    color: '#5a4b42',
+    marginBottom: 6,
   },
   cardNative: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: '#7b6c62',
+    fontSize: 13,
+    color: '#8a7a70',
   },
   tagRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: 6,
   },
   tagChip: {
     paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: '#f0e0d7',
   },
   tagText: {
-    fontSize: 12,
-    color: '#7b6c62',
+    fontSize: 11,
+    color: '#6b5b52',
   },
   flags: {
     gap: 6,
-    borderRadius: 16,
-    backgroundColor: '#f7eeea',
-    padding: 14,
   },
   flagRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 6,
   },
   flagLabel: {
     fontSize: 13,
-    color: '#7b6c62',
+    color: '#5a4b42',
   },
   flagValue: {
-    fontSize: 13,
-    color: '#5c4e44',
+    fontSize: 12,
+    color: '#8a7a70',
   },
   riskBox: {
-    borderRadius: 16,
-    backgroundColor: '#f7eeea',
-    padding: 14,
+    padding: 12,
+    borderRadius: 14,
+    backgroundColor: '#fff1f1',
+    borderWidth: 1,
+    borderColor: '#f2c9c9',
     gap: 6,
   },
   riskTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#6e5f54',
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#8b4f4f',
   },
   riskItem: {
-    fontSize: 13,
-    color: '#7b6c62',
+    fontSize: 12,
+    color: '#8b4f4f',
   },
   riskButton: {
-    alignSelf: 'flex-start',
     marginTop: 6,
-    paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 14,
-    backgroundColor: 'rgba(232, 202, 191, 0.9)',
+    borderRadius: 10,
+    backgroundColor: '#f2c9c9',
+    alignItems: 'center',
   },
   riskButtonText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#5d4e45',
+    fontSize: 12,
+    color: '#8b4f4f',
   },
   footer: {
     position: 'absolute',
-    left: 16,
-    right: 16,
-    bottom: 24,
-  },
-  ctaButton: {
-    height: 52,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(232, 202, 191, 0.9)',
-  },
-  ctaText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#5d4e45',
-  },
-  overlay: {
-    position: 'absolute',
-    top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(50, 40, 32, 0.18)',
+    padding: 16,
+    backgroundColor: '#f8f0eb',
+    borderTopWidth: 1,
+    borderTopColor: '#efe1d9',
+  },
+  ctaButton: {
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: '#e2b8a7',
     alignItems: 'center',
+  },
+  ctaText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#5a4b42',
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.35)',
     justifyContent: 'center',
+    alignItems: 'center',
     padding: 20,
   },
   overlayCard: {
     width: '100%',
-    borderRadius: 20,
-    backgroundColor: '#f7eeea',
-    padding: 18,
+    borderRadius: 16,
+    backgroundColor: '#fff7f3',
+    padding: 16,
     gap: 10,
   },
   overlayTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
-    color: '#5c4e44',
+    color: '#5a4b42',
   },
   overlayList: {
     gap: 6,
   },
   overlayItem: {
-    fontSize: 13,
-    color: '#7b6c62',
+    fontSize: 12,
+    color: '#8a7a70',
   },
   overlayActions: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
     gap: 10,
-    marginTop: 6,
-  },
-  overlayButton: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 14,
-    backgroundColor: 'rgba(232, 202, 191, 0.9)',
-  },
-  overlayButtonText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#5d4e45',
   },
   overlayButtonGhost: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: '#f2e6df',
+    alignItems: 'center',
   },
   overlayGhostText: {
-    fontSize: 13,
-    color: '#7b6c62',
+    fontSize: 12,
+    color: '#6b5b52',
+  },
+  overlayButton: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: '#f2c9c9',
+    alignItems: 'center',
+  },
+  overlayButtonText: {
+    fontSize: 12,
+    color: '#8b4f4f',
   },
   emptyWrap: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
     gap: 12,
   },
   emptyTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#5f5147',
+    fontSize: 14,
+    color: '#6b5b52',
   },
   homeButton: {
-    marginTop: 6,
     paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 14,
-    backgroundColor: 'rgba(232, 202, 191, 0.9)',
+    borderRadius: 12,
+    backgroundColor: '#f2e6df',
   },
   homeButtonText: {
-    fontSize: 13,
-    color: '#5d4e45',
+    fontSize: 12,
+    color: '#6b5b52',
   },
 });

@@ -6,6 +6,7 @@ export type ParsedConversation = {
   summary: string;
   tags: string[];
   riskFlagsCount: number;
+  rawText: string;
   flags: {
     moneyRequest: boolean;
     favorRequest: boolean;
@@ -57,6 +58,7 @@ function buildParsedConversation(text: string): ParsedConversation {
     summary,
     tags,
     riskFlagsCount,
+    rawText: text,
     flags: {
       moneyRequest,
       favorRequest,

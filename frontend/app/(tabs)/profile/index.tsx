@@ -1,5 +1,7 @@
-﻿import React, { useState } from 'react';
+import { useRouter } from 'expo-router';
+import React, { useMemo, useState } from 'react';
 import { Image, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useDayRecords } from '@/src/context/day-records-context';
 
 import TopBar from '@/src/components/TopBar';
 import SettingsMenu from '@/src/components/SettingsMenu';
@@ -7,7 +9,45 @@ import { useProfile } from '@/src/context/profile-context';
 
 export default function ProfileScreen() {
   const { profile } = useProfile();
+  const { records } = useDayRecords();
+  const router = useRouter();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const availableDates = useMemo(() => records.map((item) => item.date), [records]);
+  const availableDateSet = useMemo(() => new Set(availableDates), [availableDates]);
+  const defaultMonth = availableDates.length > 0 ? availableDates[availableDates.length - 1].slice(0, 7) : '';
+  const [activeMonth, setActiveMonth] = useState(defaultMonth);
+
+  // Keep calendar month in sync when records arrive/refresh.
+  React.useEffect(() => {
+    if (defaultMonth) {
+      setActiveMonth(defaultMonth);
+    }
+  }, [defaultMonth]);
+
+  const monthInfo = useMemo(() => {
+    if (!activeMonth) return null;
+    const [yearText, monthText] = activeMonth.split('-');
+    const year = Number(yearText);
+    const month = Number(monthText);
+    if (!year || !month) return null;
+    const firstDay = new Date(year, month - 1, 1).getDay();
+    const daysInMonth = new Date(year, month, 0).getDate();
+    return { year, month, firstDay, daysInMonth };
+  }, [activeMonth]);
+
+  const calendarCells = useMemo(() => {
+    if (!monthInfo) return [];
+    const cells = [];
+    for (let i = 0; i < monthInfo.firstDay; i += 1) {
+      cells.push({ key: `empty-${i}` });
+    }
+    for (let day = 1; day <= monthInfo.daysInMonth; day += 1) {
+      const date = `${monthInfo.year}-${String(monthInfo.month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      cells.push({ key: date, date, label: String(day) });
+    }
+    return cells;
+  }, [monthInfo]);
 
   const hasProfile = Boolean(
     profile && (profile.name || profile.age || profile.job || profile.country || profile.nativeLanguage || profile.howWeMet || profile.photoUri)
@@ -68,6 +108,66 @@ export default function ProfileScreen() {
             <Text style={styles.storyLabel}>만남 경로</Text>
             <Text style={styles.storyValue}>{profile?.howWeMet || '—'}</Text>
           </View>
+        </View>
+
+        <View style={styles.calendarCard}>
+          <Text style={styles.calendarTitle}>대화 기록 캘린더</Text>
+          {!monthInfo ? (
+            <Text style={styles.calendarEmpty}>표시할 기록이 없어요.</Text>
+          ) : (
+            <>
+              <View style={styles.calendarHeader}>
+                <Pressable
+                  style={[styles.monthButton, styles.monthButtonDisabled]}
+                  disabled>
+                  <Text style={styles.monthButtonText}>이전</Text>
+                </Pressable>
+                <Text style={styles.monthText}>{activeMonth.replace('-', '.')}</Text>
+                <Pressable
+                  style={[styles.monthButton, styles.monthButtonDisabled]}
+                  disabled>
+                  <Text style={styles.monthButtonText}>다음</Text>
+                </Pressable>
+              </View>
+              <View style={styles.weekRow}>
+                {['일', '월', '화', '수', '목', '금', '토'].map((label) => (
+                  <Text key={label} style={styles.weekText}>
+                    {label}
+                  </Text>
+                ))}
+              </View>
+              <View style={[styles.calendarGrid, { width: 7 * 36 + 6 * 8 }]}>
+                {calendarCells.map((cell) =>
+                  cell.date ? (
+                    <Pressable
+                      key={cell.key}
+                      style={[
+                        styles.dayCell,
+                        availableDateSet.has(cell.date) ? styles.dayActive : styles.dayDisabled,
+                        selectedDate === cell.date ? styles.daySelected : null,
+                      ]}
+                      onPress={() => {
+                        if (availableDateSet.has(cell.date)) {
+                          setSelectedDate(cell.date);
+                          router.push({ pathname: '/(modals)/learn', params: { date: cell.date } });
+                        }
+                      }}>
+                      <Text
+                        style={[
+                          styles.dayText,
+                          availableDateSet.has(cell.date) ? styles.dayTextActive : styles.dayTextDisabled,
+                          selectedDate === cell.date ? styles.dayTextSelected : null,
+                        ]}>
+                        {cell.label}
+                      </Text>
+                    </Pressable>
+                  ) : (
+                    <View key={cell.key} style={styles.dayEmpty} />
+                  )
+                )}
+              </View>
+            </>
+          )}
         </View>
 
         {!hasProfile ? (
@@ -236,4 +336,99 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#8b7a6f',
   },
+  calendarCard: {
+    marginTop: 12,
+    padding: 16,
+    borderRadius: 18,
+    backgroundColor: '#fff7f3',
+    borderWidth: 1,
+    borderColor: '#efe1d9',
+    gap: 12,
+  },
+  calendarTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#5f5147',
+  },
+  calendarEmpty: {
+    fontSize: 13,
+    color: '#9a8a7d',
+  },
+  calendarHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  monthButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    backgroundColor: '#f2e6df',
+  },
+  monthButtonDisabled: {
+    opacity: 0.5,
+  },
+  monthButtonText: {
+    fontSize: 12,
+    color: '#7b6c62',
+  },
+  monthText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#5f5147',
+  },
+  weekRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  weekText: {
+    width: 36,
+    textAlign: 'center',
+    fontSize: 12,
+    color: '#9a8a7d',
+  },
+  calendarGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    alignSelf: 'center',
+  },
+  dayCell: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f2e6df',
+  },
+  dayActive: {
+    backgroundColor: '#e2b8a7',
+  },
+  daySelected: {
+    borderWidth: 2,
+    borderColor: '#5f5147',
+  },
+  dayDisabled: {
+    backgroundColor: '#f2e6df',
+    opacity: 0.4,
+  },
+  dayText: {
+    fontSize: 12,
+  },
+  dayTextActive: {
+    color: '#4f4037',
+    fontWeight: '600',
+  },
+  dayTextSelected: {
+    color: '#3f332c',
+    fontWeight: '700',
+  },
+  dayTextDisabled: {
+    color: '#9a8a7d',
+  },
+  dayEmpty: {
+    width: 36,
+    height: 36,
+  },
+
 });

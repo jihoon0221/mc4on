@@ -57,6 +57,10 @@ export default function SettingsMenu({ visible, onClose }: SettingsMenuProps) {
     onClose();
     router.push('/(tabs)/profile/edit');
   };
+  const handleDebug = () => {
+    onClose();
+    router.push('/(modals)/debug-settings');
+  };
 
   const handleLogout = async () => {
     onClose();
@@ -108,6 +112,9 @@ export default function SettingsMenu({ visible, onClose }: SettingsMenuProps) {
           <Text style={[styles.sectionTitle, styles.sectionSpacing]}>개인/보안</Text>
           <Pressable style={styles.itemButton} onPress={handleProfile} accessibilityRole="button">
             <Text style={styles.itemText}>상대 정보 수정</Text>
+          </Pressable>
+          <Pressable style={styles.itemButton} onPress={handleDebug} accessibilityRole="button">
+            <Text style={styles.itemText}>디버그 설정</Text>
           </Pressable>
           <Pressable style={[styles.itemButton, styles.logoutButton]} onPress={() => void handleLogout()} accessibilityRole="button">
             <Text style={styles.logoutText}>로그아웃</Text>

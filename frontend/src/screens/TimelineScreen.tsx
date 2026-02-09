@@ -1,6 +1,6 @@
 ﻿import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { FlatList, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 
 import FilterChips, { type FilterKey } from '@/src/components/FilterChips';
@@ -8,10 +8,8 @@ import TopBar from '@/src/components/TopBar';
 import JourneyHeader from '@/src/components/JourneyHeader';
 import TimelineCard, { type TimelineCardItem } from '@/src/components/TimelineCard';
 import SettingsMenu from '@/src/components/SettingsMenu';
-import { fetchTimelineEntries } from '@/src/api/timeline';
-import { loadTimelineEntries } from '@/src/storage/timeline-storage';
+import { useTimeline } from '@/src/context/timeline-context';
 import type { BirdState as ModelBirdState } from '@/src/models/bird-state';
-import type { TimelineEntry } from '@/src/models/timeline-entry';
 import type { BirdState as VisualBirdState } from '@/src/components/BirdCharacter';
 import { getSeoulDateKey } from '@/src/utils/date';
 
@@ -20,38 +18,7 @@ const STAGE_TAGS = {
   stage3: ['#부담감조성', '#금전언급', '#링크포함', '#이미지포함'],
 };
 
-const MOCK_ITEMS: TimelineCardItem[] = [
-  {
-    id: 'mock-0',
-    groupLabel: '오늘',
-    dateLabel: '4월 24일',
-    title: '처음 인사',
-    subtitle: '최근 도움·부담과 관련된 이야기가 등장했어요.',
-    tags: ['#부담감조성', '#금전언급'],
-    status: 'pending',
-    birdState: 'healthy',
-  },
-  {
-    id: 'mock-1',
-    groupLabel: 'Day 5',
-    dateLabel: '4월 16일',
-    title: '신뢰를 강조하는 말이 많아졌어요',
-    subtitle: '개인적인 사연이 조금씩 더 공유되었어요.',
-    tags: ['#비밀공유', '#신뢰강조'],
-    status: 'learned',
-    birdState: 'uneasy',
-  },
-  {
-    id: 'mock-2',
-    groupLabel: 'Day 1',
-    dateLabel: '4월 12일',
-    title: '처음 인사를 나눴어요',
-    subtitle: '조용히 관계가 시작되었어요.',
-    tags: ['#첫인사'],
-    status: 'learned',
-    birdState: 'healthy',
-  },
-];
+const EMPTY_ITEMS: TimelineCardItem[] = [];
 
 function formatMonthDay(date: string) {
   const [year, month, day] = date.split('-').map(Number);
@@ -85,43 +52,16 @@ const WARNING_MESSAGE = '이 기록은 잠시 멈춰 다시 살펴볼 만한 부
 
 export default function TimelineScreen() {
   const router = useRouter();
-  const [entries, setEntries] = useState<TimelineEntry[]>([]);
+  const { entries } = useTimeline();
   const [filter, setFilter] = useState<FilterKey>('all');
   const [warningTarget, setWarningTarget] = useState<TimelineCardItem | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const todayKey = useMemo(() => getSeoulDateKey(), []);
 
-  useEffect(() => {
-    let mounted = true;
-    fetchTimelineEntries()
-      .then((data) => {
-        if (!mounted) return;
-        if (data.length > 0) {
-          setEntries(data);
-          return;
-        }
-        loadTimelineEntries().then((stored) => {
-          if (!mounted) return;
-          setEntries(stored);
-        });
-      })
-      .catch(() => {
-        if (!mounted) return;
-        loadTimelineEntries().then((stored) => {
-          if (!mounted) return;
-          setEntries(stored);
-        });
-      })
-      .finally(() => undefined);
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
   const sortedRecords = useMemo(() => [...entries].sort((a, b) => b.date.localeCompare(a.date)), [entries]);
 
   const items = useMemo(() => {
-    if (sortedRecords.length === 0) return MOCK_ITEMS;
+    if (sortedRecords.length === 0) return EMPTY_ITEMS;
     return sortedRecords.map((record, index) => {
       const tags = ensureHashTags(record.tags ?? []);
       const isToday = record.date === todayKey;
@@ -137,7 +77,7 @@ export default function TimelineScreen() {
         subtitle,
         tags,
         status: 'pending',
-        birdState: mapBirdState(record.birdState),
+        birdState: 'healthy',
         __meta: {
           rawTags: [...(record.tags ?? []), ...(record.warningTags ?? [])].join(' '),
           riskLevel: record.riskLevel ?? null,
@@ -217,6 +157,11 @@ export default function TimelineScreen() {
           />
         )}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
+        ListEmptyComponent={
+          <View style={styles.emptyWrap}>
+            <Text style={styles.emptyText}>아직 기록이 없어요.</Text>
+          </View>
+        }
       />
 
       {warningTarget ? (
@@ -317,6 +262,14 @@ const styles = StyleSheet.create({
   },
   separator: {
     height: 12,
+  },
+  emptyWrap: {
+    paddingVertical: 32,
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 13,
+    color: '#9a8a7d',
   },
   overlay: {
     position: 'absolute',

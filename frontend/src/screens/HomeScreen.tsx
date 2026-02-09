@@ -17,6 +17,8 @@ import {
 
 import { API_BASE_URL, apiFetch } from '@/src/api/client';
 import { uploadKakao, type KakaoUploadResponse } from '@/src/api/upload';
+import v1Result from '@/src/data/result_v1';
+import { getQuizVersion } from '@/src/storage/debug-settings';
 import type { TimelineEntry } from '@/src/models/timeline-entry';
 import { saveTimelineEntries } from '@/src/storage/timeline-storage';
 import { fetchTimelineEntries } from '@/src/api/timeline';
@@ -25,6 +27,7 @@ import Nest from '@/src/components/Nest';
 import SettingsMenu from '@/src/components/SettingsMenu';
 import TopBar from '@/src/components/TopBar';
 import { useDayRecords } from '@/src/context/day-records-context';
+import { useTimeline } from '@/src/context/timeline-context';
 import type { AnalysisResult } from '@/src/models/analysis-result';
 import type { BirdState as ModelBirdState } from '@/src/models/bird-state';
 import { getSeoulDateKey } from '@/src/utils/date';
@@ -173,6 +176,7 @@ export default function HomeScreen() {
   const [importError, setImportError] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const { addOrUpdateToday, records, replaceAll } = useDayRecords();
+  const { reload: reloadTimeline } = useTimeline();
 
   const eggCrack = useRef(new Animated.Value(0)).current;
   const eggOverlayScale = useRef(new Animated.Value(0.9)).current;
@@ -286,7 +290,10 @@ export default function HomeScreen() {
       eggCrack.setValue(0);
       eggOverlayScale.setValue(0.9);
       eggOverlayOpacity.setValue(0);
-      router.push('/(modals)/learn-notepad');
+      const latestDate = records.length
+        ? [...records].sort((a, b) => b.date.localeCompare(a.date))[0]?.date
+        : getSeoulDateKey();
+      router.push({ pathname: '/(modals)/learn', params: { date: latestDate } });
     });
   };
 
@@ -449,6 +456,7 @@ export default function HomeScreen() {
 
       let analysisResult: AnalysisResult | undefined;
       let replacedAll = false;
+      let forceReplace = false;
       try {
         logUpload('send_to_server', {
           baseUrl: API_BASE_URL,
@@ -457,15 +465,19 @@ export default function HomeScreen() {
           mimeType: file.mimeType ?? null,
           syncAnalysis: true,
         });
-        const response = await uploadKakao({
-          file: {
-            uri: targetUri,
-            name: file.name,
-            mimeType: file.mimeType ?? undefined,
-          },
-          syncAnalysis: true,
-          force: true,
-        });
+        const version = await getQuizVersion(1);
+        const response = version === 1
+          ? (v1Result as KakaoUploadResponse)
+          : await uploadKakao({
+              file: {
+                uri: targetUri,
+                name: file.name,
+                mimeType: file.mimeType ?? undefined,
+              },
+              syncAnalysis: true,
+              force: true,
+            });
+        forceReplace = version === 1;
         const fallbackResult =
           response.analysis_result ??
           (response.dailyreport && response.dailyreport.length > 0
@@ -497,11 +509,16 @@ export default function HomeScreen() {
         if (response.timeline && response.timeline.length > 0) {
           const mapped = mapTimelineResponseToEntries(response.timeline);
           await saveTimelineEntries(mapped);
-        } else {
+          await reloadTimeline();
+        } else if (!forceReplace) {
           const serverTimeline = await fetchTimelineEntries();
           if (serverTimeline.length > 0) {
             await saveTimelineEntries(serverTimeline);
+            await reloadTimeline();
           }
+        } else {
+          await saveTimelineEntries([]);
+          await reloadTimeline();
         }
 
         if (response.dailyreport && response.dailyreport.length > 0) {
@@ -531,6 +548,35 @@ export default function HomeScreen() {
           });
           await replaceAll(replaced);
           replacedAll = true;
+        }
+        if (forceReplace && !replacedAll) {
+          const now = new Date().toISOString();
+          const fallback = normalizeAnalysisResult(fallbackResult as KakaoUploadResponse['analysis_result']);
+          if (fallback) {
+            await replaceAll([
+              {
+                id: `day_${fallback.analysis_date}`,
+                date: fallback.analysis_date,
+                source: 'kakaotalk_txt',
+                sourceFileName: file.name,
+                extractedSentences: fallback.learning_items.map((learn) => learn.content_kr).filter(Boolean).slice(0, 3),
+                nativeSentences: fallback.learning_items.map((learn) => learn.content_fl).filter(Boolean),
+                flags: parsed.flags,
+                uploadCount: 1,
+                learned: false,
+                immediateRisk: {
+                  scamUrl: false,
+                  reportedAccount: false,
+                  aiImage: false,
+                },
+                immediateRiskShown: false,
+                analysisResult: fallback,
+                createdAt: now,
+                updatedAt: now,
+              },
+            ]);
+            replacedAll = true;
+          }
         }
 
         if (!analysisResult && jobId) {
