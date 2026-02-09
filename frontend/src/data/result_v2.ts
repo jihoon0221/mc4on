@@ -125,6 +125,7 @@ export function buildV2TimelineEntry(bundle: QuizBundle): TimelineEntry {
     riskLevel: bundle.summary.risk_level ?? null,
     birdState: birdStateFromRiskLevel(bundle.summary.risk_level),
     createdAt: new Date().toISOString(),
+    version: 2,
   };
 }
 

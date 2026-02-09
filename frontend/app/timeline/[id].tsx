@@ -7,6 +7,8 @@ import { useTimeline } from '@/src/context/timeline-context';
 import { mapWarningTags } from '@/src/utils/warning-tags';
 import SimilarChatCard from '@/src/components/SimilarChatCard';
 import { getV2DayIndex } from '@/src/utils/v2-day-index';
+import { getV1DayIndex } from '@/src/utils/v1-day-index';
+import RelationshipFlowHeader from '@/src/components/RelationshipFlowHeader';
 
 const FLAG_ROWS = [
   { key: 'moneyRequest', label: '금전 요청' },
@@ -49,6 +51,7 @@ export default function TimelineDetailScreen() {
     [entries, id]
   );
 
+
   const nativeSentences = record?.nativeSentences ?? [];
   const translate = (sentence: string, index: number) => {
     if (nativeSentences[index]) return nativeSentences[index];
@@ -67,6 +70,38 @@ export default function TimelineDetailScreen() {
   const showLongSummary = Boolean(longSummary) && !((riskLevel ?? 0) >= 4);
   const dayIndex = getV2DayIndex((entry?.date ?? record?.date) ?? null);
   const showSimilar = (dayIndex ?? 0) >= 6;
+
+  const relationshipLabels = useMemo(() => {
+    const date = entry?.date ?? record?.date ?? null;
+    const isV2 =
+      entry?.version === 2 ? true : entry?.version === 1 ? false : date ? Boolean(getV2DayIndex(date)) : false;
+    if (isV2) {
+      return [
+        '접촉/관심',
+        '친밀감 형성',
+        '신뢰 구축',
+        '위기 제시',
+        '금전/결제 유도',
+      ];
+    }
+    return ['첫 인사', '일상 공유', '감정 교류', '신뢰 확인', '안정감'];
+  }, [entry, record]);
+
+  const relationshipStageIndex = useMemo(() => {
+    const date = entry?.date ?? record?.date ?? null;
+    if (!date) return 0;
+    const idx =
+      entry?.version === 2
+        ? getV2DayIndex(date) ?? 1
+        : entry?.version === 1
+          ? getV1DayIndex(date) ?? 1
+          : getV2DayIndex(date) ?? getV1DayIndex(date) ?? 1;
+    if (idx <= 2) return 0;
+    if (idx <= 4) return 1;
+    if (idx <= 6) return 2;
+    if (idx <= 8) return 3;
+    return 4;
+  }, [entry, record]);
   const hasWarning = Boolean(warningText) || warningTags.length > 0;
   const shouldShowSection = hasWarning || showLongSummary;
 
@@ -128,6 +163,11 @@ export default function TimelineDetailScreen() {
         </Pressable>
 
         <Text style={styles.title}>{formatDate(record.date)}</Text>
+
+        <RelationshipFlowHeader
+          labels={relationshipLabels}
+          activeIndex={relationshipStageIndex}
+        />
 
         {shouldShowSection ? (
           <View style={styles.section}>

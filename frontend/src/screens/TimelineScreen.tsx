@@ -1,16 +1,19 @@
 ﻿import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { FlatList, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 
 import TopBar from '@/src/components/TopBar';
 import JourneyHeader from '@/src/components/JourneyHeader';
 import TimelineCard, { type TimelineCardItem } from '@/src/components/TimelineCard';
 import SettingsMenu from '@/src/components/SettingsMenu';
+import RelationshipFlowHeader from '@/src/components/RelationshipFlowHeader';
 import { useTimeline } from '@/src/context/timeline-context';
 import type { BirdState as ModelBirdState } from '@/src/models/bird-state';
 import type { BirdState as VisualBirdState } from '@/src/components/BirdCharacter';
 import { getSeoulDateKey } from '@/src/utils/date';
+import { getV1DayIndex } from '@/src/utils/v1-day-index';
+import { getV2DayIndex } from '@/src/utils/v2-day-index';
 
 const EMPTY_ITEMS: TimelineCardItem[] = [];
 
@@ -150,6 +153,37 @@ export default function TimelineScreen() {
     return cumulativeBirdByDate.get(latest.date) ?? mapBirdState(latest.birdState);
   }, [sortedRecords, cumulativeBirdByDate]);
 
+  const relationshipLabels = useMemo(() => {
+    const latest = sortedRecords[0];
+    const isV2 = latest?.version === 2 ? true : latest?.version === 1 ? false : latest ? Boolean(getV2DayIndex(latest.date)) : false;
+    if (isV2) {
+      return [
+        '접촉/관심',
+        '친밀감 형성',
+        '신뢰 구축',
+        '위기 제시',
+        '금전/결제 유도',
+      ];
+    }
+    return ['첫 인사', '일상 공유', '감정 교류', '신뢰 확인', '안정감'];
+  }, [sortedRecords]);
+
+  const relationshipStageIndex = useMemo(() => {
+    const latest = sortedRecords[0];
+    if (!latest) return 0;
+    const dayIndex =
+      latest.version === 2
+        ? getV2DayIndex(latest.date) ?? 1
+        : latest.version === 1
+          ? getV1DayIndex(latest.date) ?? 1
+          : getV2DayIndex(latest.date) ?? getV1DayIndex(latest.date) ?? 1;
+    if (dayIndex <= 2) return 0;
+    if (dayIndex <= 4) return 1;
+    if (dayIndex <= 6) return 2;
+    if (dayIndex <= 8) return 3;
+    return 4;
+  }, [sortedRecords]);
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <FlatList
@@ -159,6 +193,14 @@ export default function TimelineScreen() {
         ListHeaderComponent={
           <View style={styles.headerWrap}>
             <TopBar onPressSettings={() => setSettingsOpen(true)} />
+
+            {items.length > 0 ? (
+              <RelationshipFlowHeader
+                labels={relationshipLabels}
+                activeIndex={relationshipStageIndex}
+                birdState={flowBirdState}
+              />
+            ) : null}
 
             {highSignalToday ? (
               <Pressable

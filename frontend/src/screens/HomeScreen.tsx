@@ -140,7 +140,8 @@ function normalizeAnalysisResult(input: KakaoUploadResponse['analysis_result']):
 }
 
 function mapTimelineResponseToEntries(
-  items: NonNullable<KakaoUploadResponse['timeline']>
+  items: NonNullable<KakaoUploadResponse['timeline']>,
+  version?: 1 | 2
 ): TimelineEntry[] {
   return items.map((item) => ({
     id: item.analysis_date,
@@ -152,6 +153,7 @@ function mapTimelineResponseToEntries(
     riskLevel: item.risk_level,
     birdState: birdStateFromRiskLevel(item.risk_level),
     createdAt: new Date().toISOString(),
+    version,
   }));
 }
 
@@ -565,7 +567,7 @@ export default function HomeScreen() {
         analysisResult = normalizeAnalysisResult(fallbackResult as KakaoUploadResponse['analysis_result']);
 
         if (response.timeline && response.timeline.length > 0) {
-          const mapped = mapTimelineResponseToEntries(response.timeline);
+          const mapped = mapTimelineResponseToEntries(response.timeline, version === 2 ? 2 : 1);
           logTimeline('mapped_entries', {
             version,
             count: mapped.length,

@@ -11,4 +11,5 @@ export type TimelineEntry = {
   warningText?: string | null;
   warningTags?: string[];
   riskLevel?: number | null;
+  version?: 1 | 2;
 };
