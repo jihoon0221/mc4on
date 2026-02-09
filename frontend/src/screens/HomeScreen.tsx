@@ -18,6 +18,7 @@ import {
 import { API_BASE_URL, apiFetch } from '@/src/api/client';
 import { uploadKakao, type KakaoUploadResponse } from '@/src/api/upload';
 import v1Result from '@/src/data/result_v1';
+import { buildV2AnalysisResult, buildV2TimelineEntry, pickNextV2Bundle } from '@/src/data/result_v2';
 import { getQuizVersion } from '@/src/storage/debug-settings';
 import type { TimelineEntry } from '@/src/models/timeline-entry';
 import { saveTimelineEntries } from '@/src/storage/timeline-storage';
@@ -84,6 +85,14 @@ function mapBirdStateToVisual(state?: ModelBirdState): BirdState | null {
   return null;
 }
 
+function birdStateFromRiskLevel(level?: number | null): BirdState {
+  const value = level ?? 0;
+  if (value >= 4) return 'critical';
+  if (value >= 3) return 'distorted';
+  if (value >= 2) return 'uneasy';
+  return 'healthy';
+}
+
 function logUpload(label: string, data: Record<string, unknown>) {
   if (!ENABLE_UPLOAD_LOGS) return;
   // eslint-disable-next-line no-console
@@ -133,7 +142,7 @@ function mapTimelineResponseToEntries(
     warningText: item.warning_text,
     warningTags: item.warning_tags,
     riskLevel: item.risk_level,
-    birdState: item.bird_state > 0 ? 'anxious' : 'calm',
+    birdState: birdStateFromRiskLevel(item.risk_level),
     createdAt: new Date().toISOString(),
   }));
 }
@@ -176,7 +185,7 @@ export default function HomeScreen() {
   const [importError, setImportError] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const { addOrUpdateToday, records, replaceAll } = useDayRecords();
-  const { reload: reloadTimeline } = useTimeline();
+  const { addEntry, reload: reloadTimeline } = useTimeline();
 
   const eggCrack = useRef(new Animated.Value(0)).current;
   const eggOverlayScale = useRef(new Animated.Value(0.9)).current;
@@ -466,18 +475,57 @@ export default function HomeScreen() {
           syncAnalysis: true,
         });
         const version = await getQuizVersion(1);
-        const response = version === 1
-          ? (v1Result as KakaoUploadResponse)
-          : await uploadKakao({
-              file: {
-                uri: targetUri,
-                name: file.name,
-                mimeType: file.mimeType ?? undefined,
-              },
-              syncAnalysis: true,
-              force: true,
-            });
-        forceReplace = version === 1;
+        let response: KakaoUploadResponse | null = null;
+        if (version === 1) {
+          response = v1Result as KakaoUploadResponse;
+          forceReplace = true;
+        } else if (version === 2) {
+          const nextBundle = pickNextV2Bundle(records.map((record) => record.date));
+          if (nextBundle) {
+            const nextAnalysis = buildV2AnalysisResult(nextBundle);
+            response = {
+              analysis_result: nextAnalysis,
+              timeline: [
+                {
+                  analysis_date: nextBundle.date,
+                  summary_short: nextBundle.summary.summary_text,
+                  tags: nextBundle.summary.tags,
+                  warning_text: nextBundle.summary.warning_text ?? null,
+                  warning_tags: nextBundle.summary.warning_tags ?? [],
+                  risk_level: nextBundle.summary.risk_level ?? null,
+                  bird_state: nextBundle.summary.risk_level ?? 0,
+                },
+              ],
+              dailyreport: [
+                {
+                  analysis_date: nextBundle.date,
+                  summary_text: nextBundle.summary.summary_text,
+                  tags: nextBundle.summary.tags,
+                  warning_text: nextBundle.summary.warning_text ?? null,
+                  warning_tags: nextBundle.summary.warning_tags ?? [],
+                  risk_level: nextBundle.summary.risk_level ?? null,
+                  learning_items: nextAnalysis.learning_items.map((item) => ({
+                    content_kr: item.content_kr,
+                    content_fl: item.content_fl,
+                  })),
+                },
+              ],
+            } as KakaoUploadResponse;
+          }
+        } else {
+          response = await uploadKakao({
+            file: {
+              uri: targetUri,
+              name: file.name,
+              mimeType: file.mimeType ?? undefined,
+            },
+            syncAnalysis: true,
+            force: true,
+          });
+        }
+        if (!response) {
+          throw new Error('V2 퀴즈 데이터가 비어있어요.');
+        }
         const fallbackResult =
           response.analysis_result ??
           (response.dailyreport && response.dailyreport.length > 0
@@ -508,22 +556,29 @@ export default function HomeScreen() {
 
         if (response.timeline && response.timeline.length > 0) {
           const mapped = mapTimelineResponseToEntries(response.timeline);
-          await saveTimelineEntries(mapped);
-          await reloadTimeline();
-        } else if (!forceReplace) {
+          if (version === 2) {
+            const nextEntry = mapped[0];
+            if (nextEntry) {
+              await addEntry(nextEntry);
+            }
+          } else {
+            await saveTimelineEntries(mapped);
+            await reloadTimeline();
+          }
+        } else if (!forceReplace && version !== 2) {
           const serverTimeline = await fetchTimelineEntries();
           if (serverTimeline.length > 0) {
             await saveTimelineEntries(serverTimeline);
             await reloadTimeline();
           }
-        } else {
+        } else if (forceReplace) {
           await saveTimelineEntries([]);
           await reloadTimeline();
         }
 
         if (response.dailyreport && response.dailyreport.length > 0) {
           const now = new Date().toISOString();
-          const replaced = response.dailyreport.map((item) => {
+          const normalizedItems = response.dailyreport.map((item) => {
             const normalized = normalizeAnalysisResult(item);
             return {
               id: `day_${item.analysis_date}`,
@@ -546,8 +601,18 @@ export default function HomeScreen() {
               updatedAt: now,
             };
           });
-          await replaceAll(replaced);
-          replacedAll = true;
+
+          if (version === 2) {
+            const nextRecord = normalizedItems[0];
+            if (nextRecord) {
+              const updated = [nextRecord, ...records.filter((record) => record.date !== nextRecord.date)];
+              await replaceAll(updated);
+              replacedAll = true;
+            }
+          } else {
+            await replaceAll(normalizedItems);
+            replacedAll = true;
+          }
         }
         if (forceReplace && !replacedAll) {
           const now = new Date().toISOString();

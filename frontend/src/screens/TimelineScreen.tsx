@@ -66,8 +66,9 @@ export default function TimelineScreen() {
       const tags = ensureHashTags(record.tags ?? []);
       const isToday = record.date === todayKey;
       const groupLabel = isToday ? '오늘' : `Day ${index + 1}`;
-      const title = record.summary || record.warningText || '오늘의 기록';
-      const subtitle = record.warningText ?? '차분한 흐름으로 이어졌어요.';
+      const title = record.summary || '오늘의 기록';
+      const subtitle = '';
+      const hasWarning = Boolean(record.warningText) || (record.warningTags?.length ?? 0) > 0;
 
       return {
         id: record.id ?? record.date,
@@ -77,11 +78,12 @@ export default function TimelineScreen() {
         subtitle,
         tags,
         status: 'pending',
-        birdState: 'healthy',
+        birdState: record.birdState ?? 'healthy',
         __meta: {
           rawTags: [...(record.tags ?? []), ...(record.warningTags ?? [])].join(' '),
           riskLevel: record.riskLevel ?? null,
         },
+        __hasWarning: hasWarning,
       } as TimelineCardItem & { __meta: { rawTags: string; riskLevel: number | null } };
     });
   }, [sortedRecords, todayKey]);
@@ -144,18 +146,21 @@ export default function TimelineScreen() {
             <FilterChips selected={filter} onSelect={setFilter} />
           </View>
         }
-        renderItem={({ item }) => (
-          <TimelineCard
-            item={item}
-            onPress={() =>
-              router.push({
-                pathname: '/timeline/[id]',
-                params: { id: item.id },
-              })
-            }
-            onWarningPress={() => setWarningTarget(item)}
-          />
-        )}
+        renderItem={({ item }) => {
+          const meta = item as TimelineCardItem & { __hasWarning?: boolean };
+          return (
+            <TimelineCard
+              item={item}
+              onPress={() =>
+                router.push({
+                  pathname: '/timeline/[id]',
+                  params: { id: item.id },
+                })
+              }
+              onWarningPress={meta.__hasWarning ? () => setWarningTarget(item) : undefined}
+            />
+          );
+        }}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         ListEmptyComponent={
           <View style={styles.emptyWrap}>

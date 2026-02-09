@@ -1,11 +1,14 @@
-export type QuizType = 'word' | 'sentence' | 'pronunciation';
+export type QuizType = 'word' | 'sentence' | 'sentence_order';
 
 export type QuizQuestion = {
   id: string;
   type: QuizType;
-  prompt: string;
-  options: string[];
-  answerIndex: number;
+  prompt?: string;
+  options?: string[];
+  answerIndex?: number;
+  korean?: string;
+  shuffled?: string[];
+  answer?: string[];
 };
 
 export type QuizSummary = {
@@ -41,11 +44,11 @@ export const QUIZ_V1: QuizBundle[] = [
         answerIndex: 0,
       },
       {
-        id: '2026-01-01-pron',
-        type: 'pronunciation',
-        prompt: '"coffee"의 발음과 가장 가까운 것을 고르세요.',
-        options: ['커피', '코피', '카페'],
-        answerIndex: 0,
+        id: '2026-01-01-order',
+        type: 'sentence_order',
+        korean: '출근길에 커피 마시면서 너한테 메시지 보내고 싶었어.',
+        shuffled: ['coffee', 'you', 'I', 'message', 'wanted', 'to', 'on', 'my', 'way', 'send', 'work', 'with', 'a'],
+        answer: ['I', 'wanted', 'to', 'send', 'you', 'a', 'message', 'on', 'my', 'way', 'to', 'work', 'with', 'coffee'],
       },
     ],
     summary: {
@@ -74,11 +77,11 @@ export const QUIZ_V1: QuizBundle[] = [
         answerIndex: 0,
       },
       {
-        id: '2026-01-02-pron',
-        type: 'pronunciation',
-        prompt: '"restaurant"의 발음과 가장 가까운 것을 고르세요.',
-        options: ['레스토랑', '레스토', '레스턴트'],
-        answerIndex: 0,
+        id: '2026-01-02-order',
+        type: 'sentence_order',
+        korean: '새로 생긴 식당에 가서 점심 먹었어.',
+        shuffled: ['lunch', 'new', 'restaurant', 'I', 'had', 'the', 'at'],
+        answer: ['I', 'had', 'lunch', 'at', 'the', 'new', 'restaurant'],
       },
     ],
     summary: {
@@ -107,11 +110,11 @@ export const QUIZ_V1: QuizBundle[] = [
         answerIndex: 0,
       },
       {
-        id: '2026-01-03-pron',
-        type: 'pronunciation',
-        prompt: '"overtime"의 발음과 가장 가까운 것을 고르세요.',
-        options: ['오버타임', '오브타임', '오터타임'],
-        answerIndex: 0,
+        id: '2026-01-03-order',
+        type: 'sentence_order',
+        korean: '오늘은 야근이라 늦게 끝날 것 같아.',
+        shuffled: ['work', 'late', 'today', 'I', 'because', 'overtime', 'of', 'will'],
+        answer: ['I', 'will', 'work', 'late', 'today', 'because', 'of', 'overtime'],
       },
     ],
     summary: {
@@ -140,11 +143,11 @@ export const QUIZ_V1: QuizBundle[] = [
         answerIndex: 0,
       },
       {
-        id: '2026-01-04-pron',
-        type: 'pronunciation',
-        prompt: '"voice"의 발음과 가장 가까운 것을 고르세요.',
-        options: ['보이스', '보이시', '보이즈'],
-        answerIndex: 0,
+        id: '2026-01-04-order',
+        type: 'sentence_order',
+        korean: '오늘 하루가 길어서 조금 피곤해.',
+        shuffled: ['tired', 'a', 'bit', 'today', 'was', 'long', 'I', 'feel', 'because'],
+        answer: ['I', 'feel', 'a', 'bit', 'tired', 'because', 'today', 'was', 'long'],
       },
     ],
     summary: {
@@ -173,11 +176,11 @@ export const QUIZ_V1: QuizBundle[] = [
         answerIndex: 0,
       },
       {
-        id: '2026-01-05-pron',
-        type: 'pronunciation',
-        prompt: '"market"의 발음과 가장 가까운 것을 고르세요.',
-        options: ['마켓', '마키트', '마켙'],
-        answerIndex: 0,
+        id: '2026-01-05-order',
+        type: 'sentence_order',
+        korean: '주말이라 늦잠을 잤어.',
+        shuffled: ['weekend', 'in', 'I', 'slept', 'because', 'was', 'it', 'the'],
+        answer: ['I', 'slept', 'in', 'because', 'it', 'was', 'the', 'weekend'],
       },
     ],
     summary: {
@@ -206,11 +209,11 @@ export const QUIZ_V1: QuizBundle[] = [
         answerIndex: 0,
       },
       {
-        id: '2026-01-06-pron',
-        type: 'pronunciation',
-        prompt: '"episode"의 발음과 가장 가까운 것을 고르세요.',
-        options: ['에피소드', '에피소트', '에피소드르'],
-        answerIndex: 0,
+        id: '2026-01-06-order',
+        type: 'sentence_order',
+        korean: '추천해준 드라마를 봤어.',
+        shuffled: ['drama', 'the', 'watched', 'I', 'recommended', 'you'],
+        answer: ['I', 'watched', 'the', 'drama', 'you', 'recommended'],
       },
     ],
     summary: {
@@ -239,11 +242,11 @@ export const QUIZ_V1: QuizBundle[] = [
         answerIndex: 0,
       },
       {
-        id: '2026-01-07-pron',
-        type: 'pronunciation',
-        prompt: '"miss"의 발음과 가장 가까운 것을 고르세요.',
-        options: ['미스', '마이스', '메스'],
-        answerIndex: 0,
+        id: '2026-01-07-order',
+        type: 'sentence_order',
+        korean: '오늘은 괜히 더 보고 싶어.',
+        shuffled: ['you', 'miss', 'reason', 'for', 'today', 'no', 'I', 'more'],
+        answer: ['I', 'miss', 'you', 'more', 'today', 'for', 'no', 'reason'],
       },
     ],
     summary: {
@@ -272,11 +275,11 @@ export const QUIZ_V1: QuizBundle[] = [
         answerIndex: 0,
       },
       {
-        id: '2026-01-08-pron',
-        type: 'pronunciation',
-        prompt: '"street"의 발음과 가장 가까운 것을 고르세요.',
-        options: ['스트리트', '스트릿', '스트레이트'],
-        answerIndex: 1,
+        id: '2026-01-08-order',
+        type: 'sentence_order',
+        korean: '사진을 찍어서 바로 보냈어.',
+        shuffled: ['photo', 'sent', 'a', 'I', 'and', 'took', 'right', 'away', 'it'],
+        answer: ['I', 'took', 'a', 'photo', 'and', 'sent', 'it', 'right', 'away'],
       },
     ],
     summary: {
@@ -305,11 +308,11 @@ export const QUIZ_V1: QuizBundle[] = [
         answerIndex: 0,
       },
       {
-        id: '2026-01-09-pron',
-        type: 'pronunciation',
-        prompt: '"message"의 발음과 가장 가까운 것을 고르세요.',
-        options: ['메시지', '메세지', '메사지'],
-        answerIndex: 0,
+        id: '2026-01-09-order',
+        type: 'sentence_order',
+        korean: '그냥 연락하고 싶었어.',
+        shuffled: ['just', 'wanted', 'to', 'message', 'you', 'I'],
+        answer: ['I', 'just', 'wanted', 'to', 'message', 'you'],
       },
     ],
     summary: {
@@ -338,11 +341,11 @@ export const QUIZ_V1: QuizBundle[] = [
         answerIndex: 0,
       },
       {
-        id: '2026-01-10-pron',
-        type: 'pronunciation',
-        prompt: '"distance"의 발음과 가장 가까운 것을 고르세요.',
-        options: ['디스턴스', '디스탄스', '다이슨스'],
-        answerIndex: 1,
+        id: '2026-01-10-order',
+        type: 'sentence_order',
+        korean: '거리 있어도 괜찮아.',
+        shuffled: ['okay', 'even', 'with', 'the', 'distance', 'It', 'is'],
+        answer: ['It', 'is', 'okay', 'even', 'with', 'the', 'distance'],
       },
     ],
     summary: {

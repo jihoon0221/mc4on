@@ -9,7 +9,7 @@ import { getSeoulDateKey } from '@/src/utils/date';
 const QUIZ_TYPES = {
   word: '단어 퀴즈',
   sentence: '문장 퀴즈',
-  pronunciation: '발음 퀴즈',
+  sentence_order: '문장 배열 퀴즈',
 } as const;
 
 function pickBundle(version: number, date?: string): QuizBundle | null {
@@ -45,11 +45,17 @@ export default function QuizScreen() {
   const [selected, setSelected] = useState<number | null>(null);
   const [showError, setShowError] = useState(false);
   const [reported, setReported] = useState(false);
+  const [orderSelected, setOrderSelected] = useState<string[]>([]);
+  const [orderError, setOrderError] = useState(false);
+  const [showOrderAnswer, setShowOrderAnswer] = useState(false);
 
   useEffect(() => {
     setStepIndex(0);
     setSelected(null);
     setShowError(false);
+    setOrderSelected([]);
+    setOrderError(false);
+    setShowOrderAnswer(false);
   }, [targetDate]);
 
   useEffect(() => {
@@ -77,10 +83,36 @@ export default function QuizScreen() {
       setStepIndex((prev) => prev + 1);
       setSelected(null);
       setShowError(false);
+      setOrderSelected([]);
+      setOrderError(false);
+      setShowOrderAnswer(false);
     }
   };
 
-  const canProceed = stepIndex < 3 && selected !== null && activeQuiz && selected === activeQuiz.answerIndex;
+  const isOrderQuiz = activeQuiz?.type === 'sentence_order';
+  const orderAnswer = activeQuiz?.answer ?? [];
+  const orderCorrect =
+    isOrderQuiz &&
+    orderSelected.length === orderAnswer.length &&
+    orderSelected.every((word, index) => word === orderAnswer[index]);
+
+  useEffect(() => {
+    if (!isOrderQuiz) return;
+    if (orderSelected.length === 0) {
+      setOrderError(false);
+      return;
+    }
+    if (orderSelected.length === orderAnswer.length && !orderCorrect) {
+      setOrderError(true);
+    }
+  }, [isOrderQuiz, orderSelected, orderAnswer, orderCorrect]);
+
+  const canProceed =
+    stepIndex < 3 && activeQuiz
+      ? isOrderQuiz
+        ? orderCorrect
+        : selected !== null && selected === activeQuiz.answerIndex
+      : false;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -96,27 +128,89 @@ export default function QuizScreen() {
             <View style={styles.cardHeader}>
               <Text style={styles.cardTitle}>{QUIZ_TYPES[activeQuiz.type]}</Text>
             </View>
-            <Text style={styles.prompt}>{activeQuiz.prompt}</Text>
-            <View style={styles.options}>
-              {activeQuiz.options.map((option, index) => {
-                const isSelected = selected === index;
-                const isCorrect = index === activeQuiz.answerIndex;
-                return (
-                  <Pressable
-                    key={`${activeQuiz.id}-${index}`}
-                    style={[
-                      styles.optionButton,
-                      isSelected && styles.optionSelected,
-                      isSelected && isCorrect && styles.optionCorrect,
-                      isSelected && !isCorrect && styles.optionWrong,
-                    ]}
-                    onPress={() => handleSelect(index)}>
-                    <Text style={styles.optionText}>{option}</Text>
+            {activeQuiz.type !== 'sentence_order' ? (
+              <>
+                <Text style={styles.prompt}>{activeQuiz.prompt}</Text>
+                <View style={styles.options}>
+                  {activeQuiz.options?.map((option, index) => {
+                    const isSelected = selected === index;
+                    const isCorrect = index === activeQuiz.answerIndex;
+                    return (
+                      <Pressable
+                        key={`${activeQuiz.id}-${index}`}
+                        style={[
+                          styles.optionButton,
+                          isSelected && styles.optionSelected,
+                          isSelected && isCorrect && styles.optionCorrect,
+                          isSelected && !isCorrect && styles.optionWrong,
+                        ]}
+                        onPress={() => handleSelect(index)}>
+                        <Text style={styles.optionText}>{option}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                {showError ? <Text style={styles.errorText}>다시 시도해보세요.</Text> : null}
+              </>
+            ) : (
+              <>
+                <Text style={styles.prompt}>{activeQuiz.korean}</Text>
+                <View style={styles.orderAnswerRow}>
+                  {orderSelected.length === 0 ? (
+                    <Text style={styles.orderPlaceholder}>단어를 순서대로 눌러 문장을 완성하세요.</Text>
+                  ) : (
+                    <View style={styles.orderWordWrap}>
+                      {orderSelected.map((word, index) => (
+                        <Pressable
+                          key={`${activeQuiz.id}-selected-${index}`}
+                          style={styles.orderWordSelected}
+                          onPress={() => {
+                            const next = [...orderSelected];
+                            next.splice(index, 1);
+                            setOrderSelected(next);
+                            setOrderError(false);
+                          }}>
+                          <Text style={styles.orderWordText}>{word}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  )}
+                </View>
+                <View style={styles.orderWordWrap}>
+                  {activeQuiz.shuffled?.map((word, index) => {
+                    const used = orderSelected.includes(word);
+                    return (
+                      <Pressable
+                        key={`${activeQuiz.id}-shuffled-${index}`}
+                        style={[styles.orderWord, used && styles.orderWordDisabled]}
+                        disabled={used}
+                        onPress={() => {
+                          setOrderSelected((prev) => [...prev, word]);
+                          setOrderError(false);
+                        }}>
+                        <Text style={styles.orderWordText}>{word}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                {orderError ? <Text style={styles.errorText}>다시 시도해보세요.</Text> : null}
+                <View style={styles.orderActionRow}>
+                  <Pressable style={styles.resetButton} onPress={() => setOrderSelected([])}>
+                    <Text style={styles.resetText}>문장 다시 맞추기</Text>
                   </Pressable>
-                );
-              })}
-            </View>
-            {showError ? <Text style={styles.errorText}>다시 시도해보세요.</Text> : null}
+                  <Pressable
+                    style={styles.answerToggleButton}
+                    onPress={() => setShowOrderAnswer((prev) => !prev)}>
+                    <Text style={styles.resetText}>{showOrderAnswer ? '정답 가리기' : '정답 보기'}</Text>
+                  </Pressable>
+                </View>
+                {showOrderAnswer ? (
+                  <View style={styles.orderAnswerBox}>
+                    <Text style={styles.orderAnswerText}>{orderAnswer.join(' ')}</Text>
+                  </View>
+                ) : null}
+              </>
+            )}
             <Pressable style={[styles.nextButton, !canProceed && styles.nextButtonDisabled]} onPress={handleNext} disabled={!canProceed}>
               <Text style={styles.nextButtonText}>다음 문제</Text>
             </Pressable>
@@ -305,5 +399,83 @@ const styles = StyleSheet.create({
   warningChipText: {
     fontSize: 12,
     color: '#6b4f46',
+  },
+  orderAnswerRow: {
+    minHeight: 64,
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#eaded6',
+    backgroundColor: '#fffaf7',
+  },
+  orderPlaceholder: {
+    fontSize: 12,
+    color: '#9a8b80',
+  },
+  orderWordWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  orderWord: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    backgroundColor: '#f2e6df',
+    borderWidth: 1,
+    borderColor: '#eaded6',
+  },
+  orderWordDisabled: {
+    opacity: 0.45,
+  },
+  orderWordSelected: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    backgroundColor: '#e7f3e6',
+    borderWidth: 1,
+    borderColor: '#b7d2b5',
+  },
+  orderWordText: {
+    fontSize: 13,
+    color: '#5a4b42',
+  },
+  orderActionRow: {
+    flexDirection: 'row',
+    gap: 10,
+    flexWrap: 'wrap',
+  },
+  answerToggleButton: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#eaded6',
+    backgroundColor: '#fdf4ef',
+  },
+  orderAnswerBox: {
+    padding: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#eaded6',
+    backgroundColor: '#fffaf7',
+  },
+  orderAnswerText: {
+    fontSize: 13,
+    color: '#6b5b52',
+  },
+  resetButton: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#eaded6',
+    backgroundColor: '#f7eeea',
+  },
+  resetText: {
+    fontSize: 12,
+    color: '#7b6c62',
   },
 });

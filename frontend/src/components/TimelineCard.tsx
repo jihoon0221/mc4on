@@ -55,9 +55,11 @@ export default function TimelineCard({ item, onPress, onWarningPress }: Timeline
         <Ionicons name="chevron-forward" size={16} color="#b6a89f" />
       </View>
 
-      <Pressable style={styles.warningBadge} onPress={onWarningPress} accessibilityRole="button">
-        <Ionicons name="alert-circle" size={16} color="#caa257" />
-      </Pressable>
+      {onWarningPress ? (
+        <Pressable style={styles.warningBadge} onPress={onWarningPress} accessibilityRole="button">
+          <Ionicons name="alert-circle" size={16} color="#caa257" />
+        </Pressable>
+      ) : null}
     </Pressable>
   );
 }

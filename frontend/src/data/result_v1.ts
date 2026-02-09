@@ -26,10 +26,18 @@ type V1Result = {
 };
 
 function buildLearningItems(bundle: QuizBundle) {
-  return bundle.quizzes.map((quiz) => ({
-    content_kr: quiz.prompt,
-    content_fl: quiz.options[quiz.answerIndex] ?? '',
-  }));
+  return bundle.quizzes.map((quiz) => {
+    if (quiz.type === 'sentence_order') {
+      return {
+        content_kr: quiz.korean ?? '',
+        content_fl: quiz.answer?.join(' ') ?? '',
+      };
+    }
+    return {
+      content_kr: quiz.prompt ?? '',
+      content_fl: quiz.options?.[quiz.answerIndex ?? 0] ?? '',
+    };
+  });
 }
 
 function buildV1Result(): V1Result {
