@@ -3,7 +3,6 @@ import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import { FlatList, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 
-import FilterChips, { type FilterKey } from '@/src/components/FilterChips';
 import TopBar from '@/src/components/TopBar';
 import JourneyHeader from '@/src/components/JourneyHeader';
 import TimelineCard, { type TimelineCardItem } from '@/src/components/TimelineCard';
@@ -12,11 +11,6 @@ import { useTimeline } from '@/src/context/timeline-context';
 import type { BirdState as ModelBirdState } from '@/src/models/bird-state';
 import type { BirdState as VisualBirdState } from '@/src/components/BirdCharacter';
 import { getSeoulDateKey } from '@/src/utils/date';
-
-const STAGE_TAGS = {
-  stage2: ['#비밀공유', '#개인사', '#신뢰강조'],
-  stage3: ['#부담감조성', '#금전언급', '#링크포함', '#이미지포함'],
-};
 
 const EMPTY_ITEMS: TimelineCardItem[] = [];
 
@@ -31,13 +25,6 @@ function ensureHashTags(tags: string[]) {
   return tags.map((tag) => (tag.startsWith('#') ? tag : `#${tag}`));
 }
 
-function deriveStage(tags: string[], totalCount: number) {
-  if (tags.some((tag) => STAGE_TAGS.stage3.includes(tag))) return 3;
-  if (tags.some((tag) => STAGE_TAGS.stage2.includes(tag))) return 2;
-  if (totalCount >= 3) return 1;
-  return 0;
-}
-
 function mapBirdState(state?: ModelBirdState): VisualBirdState {
   if (!state) return 'healthy';
   if (state === 'calm') return 'healthy';
@@ -48,12 +35,35 @@ function mapBirdState(state?: ModelBirdState): VisualBirdState {
   return 'healthy';
 }
 
+function birdSeverity(state: VisualBirdState): number {
+  if (state === 'critical') return 3;
+  if (state === 'distorted') return 2;
+  if (state === 'uneasy') return 1;
+  return 0;
+}
+
+function birdFromSeverity(value: number): VisualBirdState {
+  if (value >= 3) return 'critical';
+  if (value >= 2) return 'distorted';
+  if (value >= 1) return 'uneasy';
+  return 'healthy';
+}
+
 const WARNING_MESSAGE = '이 기록은 잠시 멈춰 다시 살펴볼 만한 부분이 있어요.';
+const FLOW_MESSAGE = '최근 흐름을 요약해서 보여줘요.';
+
+function stageFromDayIndex(dayIndex: number) {
+  if (dayIndex <= 1) return 0;
+  if (dayIndex === 2) return 1;
+  if (dayIndex === 3) return 2;
+  if (dayIndex <= 6) return 3;
+  if (dayIndex <= 9) return 4;
+  return 5;
+}
 
 export default function TimelineScreen() {
   const router = useRouter();
   const { entries } = useTimeline();
-  const [filter, setFilter] = useState<FilterKey>('all');
   const [warningTarget, setWarningTarget] = useState<TimelineCardItem | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const todayKey = useMemo(() => getSeoulDateKey(), []);
@@ -64,6 +74,17 @@ export default function TimelineScreen() {
     const map = new Map<string, number>();
     ascending.forEach((record, index) => {
       map.set(record.date, index + 1);
+    });
+    return map;
+  }, [entries]);
+  const cumulativeBirdByDate = useMemo(() => {
+    const ascending = [...entries].sort((a, b) => a.date.localeCompare(b.date));
+    const map = new Map<string, VisualBirdState>();
+    let worst = 0;
+    ascending.forEach((record) => {
+      const visual = mapBirdState(record.birdState);
+      worst = Math.max(worst, birdSeverity(visual));
+      map.set(record.date, birdFromSeverity(worst));
     });
     return map;
   }, [entries]);
@@ -79,7 +100,7 @@ export default function TimelineScreen() {
       const subtitle = '';
       const hasWarning = Boolean(record.warningText) || (record.warningTags?.length ?? 0) > 0;
 
-      const visualBirdState = mapBirdState(record.birdState);
+      const visualBirdState = cumulativeBirdByDate.get(record.date) ?? mapBirdState(record.birdState);
       return {
         id: record.id ?? record.date,
         groupLabel,
@@ -98,19 +119,7 @@ export default function TimelineScreen() {
     });
   }, [sortedRecords, todayKey]);
 
-  const filtered = useMemo(() => {
-    if (filter === 'all') return items;
-    return items.filter((item) => {
-      const meta = (item as TimelineCardItem & { __meta?: { rawTags: string } }).__meta;
-      return meta ? meta.rawTags.includes(CHIP_LABELS[filter]) : item.tags.join(' ').includes(CHIP_LABELS[filter]);
-    });
-  }, [filter, items]);
-
-  const recentTags = useMemo(() => {
-    return items.slice(0, 3).flatMap((item) => item.tags);
-  }, [items]);
-
-  const stageIndex = useMemo(() => deriveStage(recentTags, items.length), [recentTags, items.length]);
+  const filtered = useMemo(() => items, [items]);
 
   const last7Count = useMemo(() => {
     const cutoff = new Date();
@@ -129,6 +138,18 @@ export default function TimelineScreen() {
     return (today.riskLevel ?? 0) >= 3 || count >= 2;
   }, [sortedRecords]);
 
+  const flowStageIndex = useMemo(() => {
+    const latest = sortedRecords[0];
+    if (!latest) return 0;
+    const dayIndex = dayIndexByDate.get(latest.date) ?? 1;
+    return stageFromDayIndex(dayIndex);
+  }, [sortedRecords, dayIndexByDate]);
+  const flowBirdState = useMemo(() => {
+    const latest = sortedRecords[0];
+    if (!latest) return 'healthy';
+    return cumulativeBirdByDate.get(latest.date) ?? mapBirdState(latest.birdState);
+  }, [sortedRecords, cumulativeBirdByDate]);
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <FlatList
@@ -139,21 +160,21 @@ export default function TimelineScreen() {
           <View style={styles.headerWrap}>
             <TopBar onPressSettings={() => setSettingsOpen(true)} />
 
-            <JourneyHeader activeIndex={stageIndex} birdState="healthy" onRewindPress={() => { /* TODO: rewind modal */ }} />
-
-            <View style={styles.warningButton}>
-              <View style={styles.warningButtonLeft}>
-                <Ionicons name="alert-circle" size={16} color="#6c5f56" />
-                <Text style={styles.warningButtonText}>주의 흐름</Text>
-              </View>
-              <View style={styles.warningBadge}>
-                <Text style={styles.warningBadgeText}>
-                  {highSignalToday ? '오늘 강한 신호' : `최근 7일 ${last7Count}개 신호`}
-                </Text>
-              </View>
-            </View>
-
-            <FilterChips selected={filter} onSelect={setFilter} />
+            {highSignalToday ? (
+              <Pressable
+                style={styles.warningButton}
+                onPress={() => {
+                  if (items.length > 0) setWarningTarget(items[0]);
+                }}>
+                <View style={styles.warningButtonLeft}>
+                  <Ionicons name="alert-circle" size={16} color="#6c5f56" />
+                  <Text style={styles.warningButtonText}>주의 흐름</Text>
+                </View>
+                <View style={styles.warningBadge}>
+                  <Text style={styles.warningBadgeText}>오늘 강한 신호</Text>
+                </View>
+              </Pressable>
+            ) : null}
           </View>
         }
         renderItem={({ item }) => {
@@ -182,8 +203,9 @@ export default function TimelineScreen() {
       {warningTarget ? (
         <View style={styles.overlay}>
           <View style={styles.overlayCard}>
-            <Text style={styles.overlayTitle}>확인해 볼까요?</Text>
-            <Text style={styles.overlayItem}>{WARNING_MESSAGE}</Text>
+            <Text style={styles.overlayTitle}>주의 흐름</Text>
+            <Text style={styles.overlayItem}>{FLOW_MESSAGE}</Text>
+            <JourneyHeader activeIndex={flowStageIndex} birdState={flowBirdState} onRewindPress={() => {}} />
             <View style={styles.overlayActions}>
               <Pressable style={styles.overlayButton} onPress={() => setWarningTarget(null)}>
                 <Text style={styles.overlayButtonText}>닫기</Text>
@@ -197,15 +219,6 @@ export default function TimelineScreen() {
     </SafeAreaView>
   );
 }
-
-const CHIP_LABELS: Record<FilterKey, string> = {
-  all: '전체',
-  money: '금전',
-  favor: '부탁',
-  praise: '과한칭찬',
-  link: '링크',
-  image: '이미지',
-};
 
 const styles = StyleSheet.create({
   safeArea: {

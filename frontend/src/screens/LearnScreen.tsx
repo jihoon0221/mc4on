@@ -9,6 +9,8 @@ import ProgressDots from '@/src/components/ProgressDots';
 import { apiFetch } from '@/src/api/client';
 import { useDayRecords } from '@/src/context/day-records-context';
 import { useTimeline } from '@/src/context/timeline-context';
+import SimilarChatCard from '@/src/components/SimilarChatCard';
+import { getV2DayIndex } from '@/src/utils/v2-day-index';
 import type { AnalysisResult, LearningItem } from '@/src/models/analysis-result';
 import type { BirdState } from '@/src/models/bird-state';
 import type { DayRecord } from '@/src/models/day-record';
@@ -25,6 +27,7 @@ type LearnScreenProps = {
 type ReportHistoryItem = {
   analysis_date: string;
   summary_text?: string | null;
+  long_summary?: string | null;
   tags?: string[] | null;
   warning_text?: string | null;
   warning_tags?: string[] | null;
@@ -80,6 +83,7 @@ function normalizeReportItem(item?: ReportHistoryItem | null): AnalysisResult | 
   return {
     analysis_date: item.analysis_date,
     summary_text: item.summary_text ?? null,
+    long_summary: item.long_summary ?? null,
     tags: item.tags ?? [],
     warning_text: item.warning_text ?? null,
     warning_tags: item.warning_tags ?? [],
@@ -171,6 +175,8 @@ export default function LearnScreen({
   const learningItems: LearningItem[] = activeAnalysis?.learning_items ?? [];
   const useDemo = learningItems.length === 0 && (!todayRecord || (todayRecord.nativeSentences?.length ?? 0) === 0);
   const hasWarning = Boolean(activeAnalysis?.warning_text && activeAnalysis.warning_text.trim().length > 0);
+  const v2DayIndex = getV2DayIndex(activeAnalysis?.analysis_date ?? todayRecord?.date ?? null);
+  const showSimilar = (v2DayIndex ?? 0) >= 6;
   const sentences = useDemo
     ? demoSentences
     : learningItems.length > 0
@@ -306,7 +312,11 @@ export default function LearnScreen({
     if (!updated) return;
     setCompleteMessage('오늘 학습을 마쳤어요.');
 
-    const summary = activeAnalysis?.summary_text ?? todayRecord.extractedSentences?.[0] ?? '오늘의 대화를 기록했어요.';
+    const summary =
+      activeAnalysis?.long_summary ??
+      activeAnalysis?.summary_text ??
+      todayRecord.extractedSentences?.[0] ??
+      '오늘의 대화를 기록했어요.';
     await addEntry({
       id: todayKey,
       date: todayKey,
@@ -499,8 +509,10 @@ export default function LearnScreen({
                 <View style={styles.analysisBadge} />
                 <Text style={styles.analysisTitle}>오늘의 분석</Text>
               </View>
-              {activeAnalysis.summary_text ? (
-                <Text style={styles.analysisBody}>{activeAnalysis.summary_text}</Text>
+              {activeAnalysis.long_summary || activeAnalysis.summary_text ? (
+                <Text style={styles.analysisBody}>
+                  {activeAnalysis.long_summary ?? activeAnalysis.summary_text}
+                </Text>
               ) : (
                 <Text style={styles.analysisBody}>오늘은 특별한 요약이 없어요.</Text>
               )}
@@ -513,6 +525,7 @@ export default function LearnScreen({
                   ))}
                 </View>
               ) : null}
+              {showSimilar ? <SimilarChatCard compact /> : null}
             </View>
 
             {hasWarning ? (
@@ -530,40 +543,6 @@ export default function LearnScreen({
                   ) : null}
                 </View>
                 <Text style={styles.warningBody}>{activeAnalysis.warning_text}</Text>
-                <View style={styles.warningChat}>
-                  <View style={styles.chatHeaderRow}>
-                    <View style={styles.chatLabelPill}>
-                      <Text style={styles.chatLabelText}>내 대화</Text>
-                    </View>
-                  </View>
-                  <View style={styles.chatBubbleGroup}>
-                    <View style={styles.chatBubbleLeft}>
-                      <Text style={styles.chatBubbleText}>
-                        정산 내용을 확인해주세요.{'\n'}골프{'\n'}
-                        {'\n'}-정산금액 : 120,000원{'\n'}-요청인원 : 6명{'\n'}-정산기한 : 2026.01.31.(토) 13:00까지
-                        {'\n'}
-                        {'\n'}20,000원을 송금해주세요.
-                      </Text>
-                      <View style={styles.chatTailLeft} />
-                    </View>
-                  </View>
-
-                  <View style={styles.chatDivider} />
-
-                  <View style={styles.chatHeaderRow}>
-                    <View style={styles.chatLabelPillAlt}>
-                      <Text style={styles.chatLabelTextAlt}>유사 스캠 예시</Text>
-                    </View>
-                  </View>
-                  <View style={styles.chatBubbleGroup}>
-                    <View style={styles.chatBubbleLeft}>
-                      <Text style={styles.chatBubbleTextAlt}>
-                        급하게 통관비를 내야 해서 오늘 안으로 송금 가능할까?
-                      </Text>
-                      <View style={styles.chatTailLeft} />
-                    </View>
-                  </View>
-                </View>
               </View>
             ) : null}
           </>

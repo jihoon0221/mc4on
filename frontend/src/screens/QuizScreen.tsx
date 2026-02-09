@@ -1,5 +1,5 @@
 import { useGlobalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { QUIZ_V1, type QuizBundle, type QuizQuestion } from '@/src/data/quiz_v1';
@@ -25,7 +25,7 @@ function pickBundle(version: number, date?: string): QuizBundle | null {
 
 export default function QuizScreen() {
   const router = useRouter();
-  const params = useGlobalSearchParams<{ date?: string }>();
+  const params = useGlobalSearchParams<{ date?: string; hideSummary?: string }>();
   const todayKey = getSeoulDateKey();
   const targetDate = params.date ?? todayKey;
 
@@ -59,8 +59,10 @@ export default function QuizScreen() {
   }, [quizVersion]);
   const resolvedDate = quizVersion === 2 ? debugV2Date ?? targetDate : targetDate;
   const bundle = useMemo(() => pickBundle(quizVersion, resolvedDate), [quizVersion, resolvedDate]);
+  const hideSummary = params.hideSummary === '1';
   const quizzes = bundle?.quizzes ?? [];
   const summary = bundle?.summary;
+  const highRisk = (summary?.risk_level ?? 0) >= 4;
 
   const [stepIndex, setStepIndex] = useState(0);
   const [selected, setSelected] = useState<number | null>(null);
@@ -69,6 +71,7 @@ export default function QuizScreen() {
   const [orderSelected, setOrderSelected] = useState<string[]>([]);
   const [orderError, setOrderError] = useState(false);
   const [showOrderAnswer, setShowOrderAnswer] = useState(false);
+  const reportOpenedRef = useRef(false);
 
   useEffect(() => {
     setStepIndex(0);
@@ -77,7 +80,19 @@ export default function QuizScreen() {
     setOrderSelected([]);
     setOrderError(false);
     setShowOrderAnswer(false);
+    reportOpenedRef.current = false;
   }, [targetDate]);
+
+  useEffect(() => {
+    if (!hideSummary) return;
+    if (stepIndex !== 3) return;
+    if (highRisk) return;
+    if (typeof router.canGoBack === 'function' ? router.canGoBack() : false) {
+      router.back();
+    } else {
+      router.replace('/(tabs)');
+    }
+  }, [hideSummary, stepIndex, highRisk, router]);
 
   useEffect(() => {
     if (stepIndex === 3) {
@@ -93,6 +108,11 @@ export default function QuizScreen() {
     if (index === activeQuiz.answerIndex) {
       setShowError(false);
       setSelected(index);
+      if (stepIndex < 3) {
+        setTimeout(() => {
+          handleNext();
+        }, 200);
+      }
     } else {
       setShowError(true);
       setSelected(index);
@@ -128,12 +148,40 @@ export default function QuizScreen() {
     }
   }, [isOrderQuiz, orderSelected, orderAnswer, orderCorrect]);
 
+  useEffect(() => {
+    if (!isOrderQuiz) return;
+    if (!orderCorrect) return;
+    if (stepIndex >= 3) return;
+    const timer = setTimeout(() => {
+      handleNext();
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [isOrderQuiz, orderCorrect, stepIndex]);
+
+  useEffect(() => {
+    if (!highRisk) {
+      reportOpenedRef.current = false;
+      return;
+    }
+    if (reportOpenedRef.current) return;
+    reportOpenedRef.current = true;
+    router.push('/(modals)/report');
+  }, [highRisk, router]);
+
+  if (highRisk) {
+    return <SafeAreaView style={styles.safeArea} />;
+  }
+
   const canProceed =
     stepIndex < 3 && activeQuiz
       ? isOrderQuiz
         ? orderCorrect
         : selected !== null && selected === activeQuiz.answerIndex
       : false;
+
+  if (stepIndex === 3 && hideSummary) {
+    return <SafeAreaView style={styles.safeArea} />;
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -232,16 +280,13 @@ export default function QuizScreen() {
                 ) : null}
               </>
             )}
-            <Pressable style={[styles.nextButton, !canProceed && styles.nextButtonDisabled]} onPress={handleNext} disabled={!canProceed}>
-              <Text style={styles.nextButtonText}>다음 문제</Text>
-            </Pressable>
           </View>
         ) : (
           <View style={styles.card}>
             <View style={styles.cardHeader}>
               <Text style={styles.cardTitle}>오늘의 요약</Text>
             </View>
-            <Text style={styles.summaryText}>{summary?.summary_text ?? '요약이 없어요.'}</Text>
+            <Text style={styles.summaryText}>{summary?.long_summary ?? summary?.summary_text ?? '요약이 없어요.'}</Text>
             <View style={styles.tagRow}>
               {(summary?.tags ?? []).map((tag) => (
                 <View key={tag} style={styles.tagChip}>

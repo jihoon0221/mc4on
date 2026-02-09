@@ -17,6 +17,7 @@ type V2TimelineEntry = {
 type V2DailyReport = {
   analysis_date: string;
   summary_text: string;
+  long_summary?: string | null;
   tags: string[];
   warning_text: string | null;
   warning_tags: string[];
@@ -66,6 +67,7 @@ export function buildV2Result(): V2Result {
   const dailyreport = QUIZ_V2.map((bundle) => ({
     analysis_date: bundle.date,
     summary_text: bundle.summary.summary_text,
+    long_summary: bundle.summary.long_summary ?? null,
     tags: bundle.summary.tags,
     warning_text: bundle.summary.warning_text ?? null,
     warning_tags: bundle.summary.warning_tags ?? [],
@@ -98,6 +100,7 @@ export function buildV2AnalysisResult(bundle: QuizBundle): AnalysisResult {
   return {
     analysis_date: bundle.date,
     summary_text: bundle.summary.summary_text ?? null,
+    long_summary: bundle.summary.long_summary ?? null,
     tags: bundle.summary.tags ?? [],
     warning_text: bundle.summary.warning_text ?? null,
     warning_tags: bundle.summary.warning_tags ?? [],

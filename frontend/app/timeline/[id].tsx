@@ -5,6 +5,8 @@ import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'rea
 import { useDayRecords } from '@/src/context/day-records-context';
 import { useTimeline } from '@/src/context/timeline-context';
 import { mapWarningTags } from '@/src/utils/warning-tags';
+import SimilarChatCard from '@/src/components/SimilarChatCard';
+import { getV2DayIndex } from '@/src/utils/v2-day-index';
 
 const FLAG_ROWS = [
   { key: 'moneyRequest', label: '금전 요청' },
@@ -58,9 +60,15 @@ export default function TimelineDetailScreen() {
     return record ? buildTags(record.flags) : [];
   }, [entry, record]);
 
+  const longSummary = record?.analysisResult?.long_summary ?? null;
   const warningText = entry?.warningText ?? record?.analysisResult?.warning_text ?? null;
   const warningTags = entry?.warningTags ?? record?.analysisResult?.warning_tags ?? [];
+  const riskLevel = entry?.riskLevel ?? record?.analysisResult?.risk_level ?? null;
+  const showLongSummary = Boolean(longSummary) && !((riskLevel ?? 0) >= 4);
+  const dayIndex = getV2DayIndex((entry?.date ?? record?.date) ?? null);
+  const showSimilar = (dayIndex ?? 0) >= 6;
   const hasWarning = Boolean(warningText) || warningTags.length > 0;
+  const shouldShowSection = hasWarning || showLongSummary;
 
   const riskLabels = useMemo(() => {
     if (!record?.immediateRisk) return [];
@@ -121,51 +129,34 @@ export default function TimelineDetailScreen() {
 
         <Text style={styles.title}>{formatDate(record.date)}</Text>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>오늘의 학습</Text>
-          <View style={styles.cards}>
-            {record?.extractedSentences?.length ? (
-              record.extractedSentences.map((sentence, index) => (
-                <View key={`${sentence}-${index}`} style={styles.card}>
-                  <Text style={styles.cardKorean}>{sentence}</Text>
-                  <Text style={styles.cardNative}>{translate(sentence, index)}</Text>
-                </View>
-              ))
-            ) : (
-              <View style={styles.card}>
-                <Text style={styles.cardKorean}>학습 기록이 없어요.</Text>
-              </View>
-            )}
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>태그</Text>
-          <View style={styles.tagRow}>
-            {tags.map((tag) => (
-              <View key={tag} style={styles.tagChip}>
-                <Text style={styles.tagText}>{tag}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-
-        {hasWarning ? (
+        {shouldShowSection ? (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>경고</Text>
-            {warningText ? <Text style={styles.warningText}>{warningText}</Text> : null}
-            {warningTags.length > 0 ? (
-              <View style={styles.tagRow}>
-                {mapWarningTags(warningTags).map((tag) => {
-                  const label = tag.startsWith('#') ? tag : `#${tag}`;
-                  return (
-                    <View key={label} style={styles.tagChip}>
-                      <Text style={styles.tagText}>{label}</Text>
-                    </View>
-                  );
-                })}
+            {hasWarning ? (
+              <View style={styles.warningBox}>
+                {warningText ? <Text style={styles.warningText}>{warningText}</Text> : null}
+                {warningTags.length > 0 ? (
+                  <View style={styles.warningTagRow}>
+                    {mapWarningTags(warningTags).map((tag) => {
+                      const label = tag.startsWith('#') ? tag : `#${tag}`;
+                      return (
+                        <View key={label} style={styles.warningTagChip}>
+                          <Text style={styles.warningTagText}>{label}</Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+                ) : null}
+                {riskLevel !== null && riskLevel >= 4 ? (
+                  <Pressable style={styles.reportButton} onPress={() => router.push('/(modals)/report')}>
+                    <Text style={styles.reportButtonText}>신고하기</Text>
+                  </Pressable>
+                ) : null}
               </View>
             ) : null}
+            {showLongSummary ? (
+              <Text style={styles.longSummaryText}>{longSummary}</Text>
+            ) : null}
+            {showSimilar ? <SimilarChatCard compact /> : null}
           </View>
         ) : null}
 
@@ -254,6 +245,48 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     color: '#5f5147',
+  },
+  longSummaryText: {
+    marginTop: 10,
+    fontSize: 13,
+    lineHeight: 20,
+    color: '#6b4a4a',
+  },
+  warningBox: {
+    borderRadius: 16,
+    padding: 14,
+    gap: 10,
+    backgroundColor: '#fff1f1',
+    borderWidth: 1,
+    borderColor: '#f1b5b5',
+  },
+  warningTagRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  warningTagChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: '#ffe4e4',
+  },
+  warningTagText: {
+    fontSize: 12,
+    color: '#a44545',
+    fontWeight: '600',
+  },
+  reportButton: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: '#d64545',
+  },
+  reportButtonText: {
+    fontSize: 12,
+    color: '#fff',
+    fontWeight: '700',
   },
   cards: {
     gap: 10,

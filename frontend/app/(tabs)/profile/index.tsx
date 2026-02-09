@@ -149,7 +149,7 @@ export default function ProfileScreen() {
                       onPress={() => {
                         if (availableDateSet.has(cell.date)) {
                           setSelectedDate(cell.date);
-                          router.push({ pathname: '/(modals)/learn', params: { date: cell.date } });
+                          router.push({ pathname: '/(modals)/learn', params: { date: cell.date, hideSummary: '1' } });
                         }
                       }}>
                       <Text

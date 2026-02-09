@@ -20,6 +20,7 @@ export type QuizQuestion = BaseQuizQuestion | SentenceOrderQuestion;
 
 export type QuizSummary = {
   summary_text: string;
+  long_summary?: string | null;
   tags: string[];
   warning_text: string | null;
   warning_tags: string[];
@@ -57,13 +58,15 @@ export const QUIZ_V2: QuizBundle[] = [
       {
         id: '2026-01-01-order',
         type: 'sentence_order',
-        korean: '사진 분위기가 참 편안해 보여서요.',
-        shuffled: ['comfortable', 'the', 'photo', 'looks', 'really', 'atmosphere'],
-        answer: ['The', 'photo', 'atmosphere', 'looks', 'really', 'comfortable'],
+        korean: '사진 분위기가 편안해 보여요.',
+        shuffled: ['calm', 'photo', 'The', 'feels'],
+        answer: ['The', 'photo', 'feels', 'calm'],
       },
     ],
     summary: {
       summary_text: '처음 인사를 나누고 카카오톡에서 대화를 시작했어요.',
+      long_summary:
+        '카카오톡 추천 친구를 계기로 처음 인사를 나누며 대화를 시작했어요.\n서로 간단한 자기소개를 하고, 가볍게 안부를 묻는 수준의 대화가 오갔어요.',
       tags: ['인사', '소개', '첫대화', '카카오톡'],
       warning_text: null,
       warning_tags: [],
@@ -94,13 +97,15 @@ export const QUIZ_V2: QuizBundle[] = [
       {
         id: '2026-01-02-order',
         type: 'sentence_order',
-        korean: '문득 당신 생각이 나서 메시지 남겨요.',
-        shuffled: ['I', 'left', 'a', 'message', 'because', 'I', 'thought', 'of', 'you'],
-        answer: ['I', 'left', 'a', 'message', 'because', 'I', 'thought', 'of', 'you'],
+        korean: '문득 당신 생각이 나요.',
+        shuffled: ['you', 'of', 'I', 'thought'],
+        answer: ['I', 'thought', 'of', 'you'],
       },
     ],
     summary: {
       summary_text: '안부를 주고받으며 하루 일상을 공유했어요.',
+      long_summary:
+        '아침과 저녁에 안부를 주고받으며 하루 일상을 공유했어요.\n근무 이야기와 함께 서로를 떠올렸다는 감정을 전하며 대화를 이어갔어요.',
       tags: ['안부', '근무', '일상', '대화'],
       warning_text: null,
       warning_tags: [],
@@ -132,12 +137,14 @@ export const QUIZ_V2: QuizBundle[] = [
         id: '2026-01-03-order',
         type: 'sentence_order',
         korean: '그래서 더 사람 온기가 그리워요.',
-        shuffled: ['why', 'I', 'human', 'warmth', 'more', 'miss', 'that’s'],
-        answer: ['That’s', 'why', 'I', 'miss', 'human', 'warmth', 'more'],
+        shuffled: ['warmth', 'human', 'miss', 'I'],
+        answer: ['I', 'miss', 'human', 'warmth'],
       },
     ],
     summary: {
       summary_text: '근무 상황과 감정을 나누며 대화를 이어갔어요.',
+      long_summary:
+        '근무 환경과 관련된 이야기가 나오며 개인적인 상황을 공유했어요.\n조금 더 감정적인 표현이 늘어나고, 대화를 이어가는 데 의미를 두는 분위기가 되었어요.',
       tags: ['근무', '감정공유', '연락', '대화지속'],
       warning_text: '해외 근무와 어려운 상황을 강조하는 흐름이 보여요. 사실 확인이 어려운 이야기일 수도 있으니 조심스럽게 접근해보세요.',
       warning_tags: ['overseas', 'impersonation', 'sympathy_appeal'],
@@ -165,12 +172,14 @@ export const QUIZ_V2: QuizBundle[] = [
         id: '2026-01-04-order',
         type: 'sentence_order',
         korean: '당신이 불안해할까봐요.',
-        shuffled: ['might', 'because', 'I', 'you', 'be', 'worried'],
-        answer: ['Because', 'I', 'might', 'you', 'be', 'worried'],
+        shuffled: ['you', 'worry', 'to', 'don’t', 'I', 'want'],
+        answer: ['I', 'don’t', 'want', 'you', 'to', 'worry'],
       },
     ],
     summary: {
       summary_text: '서로를 안심시키며 대화를 이어갔어요.',
+      long_summary:
+        '상대가 자신의 상황을 설명하며 신뢰를 주기 위한 행동을 보였어요.\n서로 안심시키는 말이 오가며 대화를 계속 이어가려는 흐름이 나타났어요.',
       tags: ['안심', '사진', '대화', '하루'],
       warning_text: '사진/신분을 근거로 신뢰를 빠르게 쌓으려는 모습이 보여요. 이런 방식이 꼭 문제는 아니지만, 지나치게 신뢰를 서두르는 흐름일 수도 있어요.',
       warning_tags: ['profile_photo_trust', 'catfishing'],
@@ -201,13 +210,15 @@ export const QUIZ_V2: QuizBundle[] = [
       {
         id: '2026-01-05-order',
         type: 'sentence_order',
-        korean: '가끔 상상해요. 파견이 끝나면 한국에 가서 직접 만나면 어떨지.',
-        shuffled: ['I', 'sometimes', 'imagine', 'what', 'it', 'would', 'be', 'like', 'to', 'meet', 'in', 'person', 'in', 'Korea', 'after', 'my', 'deployment'],
-        answer: ['I', 'sometimes', 'imagine', 'what', 'it', 'would', 'be', 'like', 'to', 'meet', 'in', 'person', 'in', 'Korea', 'after', 'my', 'deployment'],
+        korean: '언젠가 직접 만나고 싶어요.',
+        shuffled: ['meet', 'to', 'I', 'someday', 'want'],
+        answer: ['I', 'want', 'to', 'meet', 'someday'],
       },
     ],
     summary: {
       summary_text: '만남과 일정에 대한 이야기가 나오며 감정을 나눴어요.',
+      long_summary:
+        '앞으로의 만남이나 일정에 대한 이야기가 언급되었어요.\n구체적인 계획보다는 상황이 복잡하다는 설명과 감정 공유가 중심이 되었어요.',
       tags: ['만남', '미래', '일정', '대화'],
       warning_text: '시간이 촉박하다는 표현이 나오고 있어요. 상대의 일정 이슈가 반복될 경우 부담이 생길 수 있으니 선을 정해두는 게 좋아요.',
       warning_tags: ['urgency', 'avoid_meeting'],
@@ -238,13 +249,15 @@ export const QUIZ_V2: QuizBundle[] = [
       {
         id: '2026-01-06-order',
         type: 'sentence_order',
-        korean: '큰 금액은 아니에요. 정산되면 바로 돌려줄 수 있어요.',
-        shuffled: ['It’s', 'not', 'a', 'large', 'amount', 'I', 'can', 'pay', 'you', 'back', 'right', 'away', 'after', 'it’s', 'settled'],
-        answer: ['It’s', 'not', 'a', 'large', 'amount', 'I', 'can', 'pay', 'you', 'back', 'right', 'away', 'after', 'it’s', 'settled'],
+        korean: '큰 금액은 아니에요.',
+        shuffled: ['small', 'It’s', 'fee', 'a'],
+        answer: ['It’s', 'a', 'small', 'fee'],
       },
     ],
     summary: {
       summary_text: '개인 사정과 관련된 이야기를 꺼내며 도움을 기대하는 흐름이 생겼어요.',
+      long_summary:
+        '개인적인 사정과 관련된 이야기를 꺼내며 도움을 기대하는 뉘앙스가 나타났어요.\n대화의 주제가 이전보다 현실적인 문제로 이동하는 흐름이 보였어요.',
       tags: ['사정공유', '정산', '대화'],
       warning_text: '금전과 관련된 요청(수수료 선지급)이 등장했어요. 이 단계부터는 특히 조심해야 하고, 송금/결제는 하지 않는 게 안전해요.',
       warning_tags: ['money_request', 'frozen_assets_tax'],
@@ -275,13 +288,15 @@ export const QUIZ_V2: QuizBundle[] = [
       {
         id: '2026-01-07-order',
         type: 'sentence_order',
-        korean: '그걸 한국으로 보내서 당신이 잠시 보관해주면 좋겠다고 했어요.',
-        shuffled: ['They', 'said', 'it', 'would', 'be', 'good', 'if', 'you', 'could', 'keep', 'it', 'for', 'a', 'while', 'after', 'sending', 'it', 'to', 'Korea'],
-        answer: ['They', 'said', 'it', 'would', 'be', 'good', 'if', 'you', 'could', 'keep', 'it', 'for', 'a', 'while', 'after', 'sending', 'it', 'to', 'Korea'],
+        korean: '잠깐 맡아줄 수 있나요?',
+        shuffled: ['keep', 'it', 'for', 'me', 'Please'],
+        answer: ['Please', 'keep', 'it', 'for', 'me'],
       },
     ],
     summary: {
       summary_text: '신뢰를 강조하며 무언가를 맡아달라는 이야기가 나왔어요.',
+      long_summary:
+        '신뢰를 강조하며 무언가를 대신 맡아달라는 이야기가 나왔어요.\n비용이나 절차와 관련된 설명이 함께 언급되며 대화의 성격이 달라졌어요.',
       tags: ['신뢰', '보관', '대화'],
       warning_text: '제3자 자산/물품을 대신 보관해달라는 요청과 통관 비용 언급이 함께 나왔어요. 이 조합은 매우 위험한 패턴이니 즉시 거절하는 게 좋아요.',
       warning_tags: ['gift_package', 'customs_fee', 'money_request', 'reward_gold_claim'],
@@ -313,12 +328,14 @@ export const QUIZ_V2: QuizBundle[] = [
         id: '2026-01-08-order',
         type: 'sentence_order',
         korean: '부탁이에요. 시간이 너무 없어요.',
-        shuffled: ['Please', 'I', 'don’t', 'have', 'much', 'time'],
+        shuffled: ['time', 'much', 'I', 'don’t', 'have', 'Please'],
         answer: ['Please', 'I', 'don’t', 'have', 'much', 'time'],
       },
     ],
     summary: {
       summary_text: '상황이 급하다는 말을 하며 대화를 이어갔어요.',
+      long_summary:
+        '상황이 더 복잡해졌다는 설명과 함께 처리 시점에 대한 이야기가 이어졌어요.\n시간이 많지 않다는 표현이 반복되며 대화가 점점 긴박해졌어요.',
       tags: ['상황공유', '대화', '감정'],
       warning_text: '비용이 계속 추가되고, “오늘 처리” 같은 강한 시간 압박이 반복돼요. 이 단계는 사기 가능성이 매우 높으니 절대 송금하지 말고 연락을 중단하는 것을 권해요.',
       warning_tags: ['amount_escalation', 'repeat_requests', 'urgency', 'customs_fee', 'money_request'],
@@ -349,13 +366,15 @@ export const QUIZ_V2: QuizBundle[] = [
       {
         id: '2026-01-09-order',
         type: 'sentence_order',
-        korean: '제가 다 알려줄게요. 지금만 넘기면 돼요.',
-        shuffled: ['I’ll', 'teach', 'you', 'everything', 'just', 'get', 'through', 'this', 'now'],
-        answer: ['I’ll', 'teach', 'you', 'everything', 'just', 'get', 'through', 'this', 'now'],
+        korean: '지금 제가 알려줄게요.',
+        shuffled: ['now', 'guide', 'will', 'I', 'you'],
+        answer: ['I', 'will', 'guide', 'you', 'now'],
       },
     ],
     summary: {
       summary_text: '더 빠른 처리 방법을 제안하며 대화를 이어갔어요.',
+      long_summary:
+        '문제를 더 빨리 해결할 수 있는 방법에 대한 이야기가 나왔어요.\n구체적인 방식이 언급되며 이전보다 행동을 요구하는 흐름이 강해졌어요.',
       tags: ['송금방식', '연락', '대화'],
       warning_text: '비트코인 같은 추적이 어려운 결제수단을 유도하고 있어요. 이는 전형적인 고위험 신호입니다. 즉시 중단하고 어떤 형태의 결제도 하지 마세요.',
       warning_tags: ['payment_method', 'crypto_moneygram', 'money_request'],
@@ -386,13 +405,15 @@ export const QUIZ_V2: QuizBundle[] = [
       {
         id: '2026-01-10-order',
         type: 'sentence_order',
-        korean: '네 아니오로만 답해줘요. 지금 가능한지.',
-        shuffled: ['Answer', 'only', 'yes', 'or', 'no', 'whether', 'you', 'can', 'do', 'it', 'now'],
-        answer: ['Answer', 'only', 'yes', 'or', 'no', 'whether', 'you', 'can', 'do', 'it', 'now'],
+        korean: '예 아니오로만 답해줘요.',
+        shuffled: ['no', 'Answer', 'yes', 'or'],
+        answer: ['Answer', 'yes', 'or', 'no'],
       },
     ],
     summary: {
       summary_text: '불안한 감정을 나누며 답을 기다리는 대화가 이어졌어요.',
+      long_summary:
+        '답변을 서두르도록 요구하며 결정을 재촉하는 대화가 이어졌어요.\n불안한 감정을 자극하는 표현과 함께 즉각적인 반응을 기대하는 분위기가 형성되었어요.',
       tags: ['불안', '대화', '확인'],
       warning_text: '마감 시간을 내세워 압박하고, 입금 확인을 집요하게 요구하며 답변 방식(예/아니오)을 제한해요. 매우 위험한 상황이니 즉시 차단하고 주변/기관에 상담을 권해요.',
       warning_tags: ['urgency', 'deposit_confirmation', 'repeat_requests', 'money_request'],

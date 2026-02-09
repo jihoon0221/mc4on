@@ -18,14 +18,8 @@ const emptyProfile: Profile = {
 };
 const VERIFICATION_URL =
   'https://cafe.naver.com/f-e/cafes/29640210/articles/26046?boardtype=I&menuid=2&referrerAllArticles=false&page=7';
-function isLikelyStolenPhoto(uri?: string) {
-  if (!uri) return false;
-  return /fake|scam|stolen|impersonat/i.test(uri);
-}
-
-function shouldTriggerScamWarning(name?: string, uri?: string) {
-  if (name?.trim().toLowerCase() === 'daniel') return true;
-  return isLikelyStolenPhoto(uri);
+function shouldTriggerScamWarning(uri?: string) {
+  return Boolean(uri);
 }
 
 export default function ProfileEditScreen() {
@@ -74,8 +68,8 @@ export default function ProfileEditScreen() {
     });
   };
 
-  const runPhotoCheck = (name?: string, uri?: string) => {
-    if (shouldTriggerScamWarning(name, uri)) {
+  const runPhotoCheck = (uri?: string) => {
+    if (shouldTriggerScamWarning(uri)) {
       setScamPhotoUri(uri ?? null);
       setScamWarningVisible(true);
     }
@@ -90,7 +84,7 @@ export default function ProfileEditScreen() {
     });
     if (!result.canceled && result.assets[0]?.uri) {
       setHasChanges(true);
-      runPhotoCheck(draft.name, result.assets[0].uri);
+      runPhotoCheck(result.assets[0].uri);
       setDraft((prev) => {
         const next = { ...prev, photoUri: result.assets[0].uri };
         queueSave(next);
@@ -104,7 +98,9 @@ export default function ProfileEditScreen() {
     setSaveToast('저장되었습니다.');
     if (saveToastTimer.current) clearTimeout(saveToastTimer.current);
     saveToastTimer.current = setTimeout(() => setSaveToast(''), 1400);
-    runPhotoCheck(draft.name, draft.photoUri);
+    if (draft.photoUri && draft.photoUri !== baseline.photoUri) {
+      runPhotoCheck(draft.photoUri);
+    }
   };
 
   const showVerifyHint = () => {

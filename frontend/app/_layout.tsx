@@ -57,6 +57,10 @@ export default function RootLayout() {
                     name="(modals)/learn-notepad"
                     options={{ presentation: "transparentModal", headerShown: false }}
                   />
+                  <Stack.Screen
+                    name="(modals)/report"
+                    options={{ presentation: "transparentModal", headerShown: false }}
+                  />
                 </Stack>
               </AuthGate>
               <StatusBar style="auto" />

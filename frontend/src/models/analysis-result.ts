@@ -8,6 +8,7 @@ export type LearningItem = {
 export type AnalysisResult = {
   analysis_date: string;
   summary_text: string | null;
+  long_summary?: string | null;
   tags: string[];
   warning_text: string | null;
   warning_tags: string[];

@@ -13,6 +13,7 @@ type V1TimelineEntry = {
 type V1DailyReport = {
   analysis_date: string;
   summary_text: string;
+  long_summary?: string | null;
   tags: string[];
   warning_text: string | null;
   warning_tags: string[];
@@ -54,6 +55,7 @@ function buildV1Result(): V1Result {
   const dailyreport = QUIZ_V1.map((bundle) => ({
     analysis_date: bundle.date,
     summary_text: bundle.summary.summary_text,
+    long_summary: bundle.summary.long_summary ?? null,
     tags: bundle.summary.tags,
     warning_text: bundle.summary.warning_text ?? null,
     warning_tags: bundle.summary.warning_tags ?? [],

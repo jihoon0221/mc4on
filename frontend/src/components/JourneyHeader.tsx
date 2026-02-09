@@ -1,9 +1,17 @@
 ﻿import React from 'react';
-import { ImageBackground, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 import BirdCharacter, { type BirdState } from '@/src/components/BirdCharacter';
 
-const STAGE_LABELS = ['처음', '대화 잦아짐', '공유 많아짐', '주제 변화'] as const;
+const STAGE_LABELS = [
+  '접촉 및 계기 형성',
+  '친밀감 구축',
+  '신뢰 형성',
+  '신뢰 강화 및 배경 설정',
+  '금전 요구 및 결제 유도',
+  '압박·잠적',
+] as const;
 
 type JourneyHeaderProps = {
   activeIndex: number;
@@ -22,120 +30,71 @@ export default function JourneyHeader({
   ctaLabel,
   birdState = 'healthy',
 }: JourneyHeaderProps) {
-  const [debugOpen, setDebugOpen] = React.useState(false);
-  const [debugIndex, setDebugIndex] = React.useState<number | null>(null);
   const maxIndex = STAGE_LABELS.length - 1;
-  const resolvedIndex = Math.max(0, Math.min(debugIndex ?? activeIndex, maxIndex));
-  const progressRatio = maxIndex <= 0 ? 0 : resolvedIndex / maxIndex;
+  const resolvedIndex = Math.max(0, Math.min(activeIndex, maxIndex));
 
   return (
     <View style={styles.card}>
-      <Pressable
-        style={styles.debugButton}
-        onPress={() => setDebugOpen(true)}
-        accessibilityRole="button">
-        <Text style={styles.debugButtonText}>디버그</Text>
-      </Pressable>
-      <View style={styles.hero}>
-        <ImageBackground
-          source={require('@/assets/images/timelinebg.png')}
-          style={styles.heroImage}
-          imageStyle={styles.heroImageInner}
-          resizeMode="cover"
-        >
-          <View style={[styles.trackWrap, styles.trackOverlay]}>
-            <View style={styles.labelRow}>
-          {STAGE_LABELS.map((label, index) => (
-            <Text
-              key={label}
-              style={[
-                styles.stageLabel,
-                index > resolvedIndex && styles.stageLabelHidden,
-                index < resolvedIndex && styles.stageLabelCompleted,
-                index === resolvedIndex && styles.stageLabelActive,
-              ]}>
-              {label}
-            </Text>
-          ))}
+      <View style={styles.headerRow}>
+        <View style={styles.sirenBadge}>
+          <Ionicons name="alert-circle" size={18} color="#c83b3b" />
         </View>
-        <View style={styles.track}>
-          <View style={[styles.trackFill, { width: `${progressRatio * 100}%` }]} />
-          <View style={styles.checkpointRow}>
-            {STAGE_LABELS.map((_, index) => (
-              <View
-                key={`checkpoint-${index}`}
-                style={[
-                  styles.checkpoint,
-                  index > resolvedIndex && styles.checkpointHidden,
-                  index < resolvedIndex && styles.checkpointCompleted,
-                  index === resolvedIndex ? styles.checkpointActive : styles.checkpointInactive,
-                ]}>
-                <View style={styles.checkpointCore} />
+        <Text style={styles.headerTitle}>주의 흐름</Text>
+        <View style={styles.headerSpacer} />
+        <View style={styles.birdWrap} pointerEvents="none">
+          <View style={styles.birdScale}>
+            <BirdCharacter state={birdState} />
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.verticalFlow}>
+        {STAGE_LABELS.map((label, index) => {
+          const isPast = index < resolvedIndex;
+          const isCurrent = index === resolvedIndex;
+          const intensity = Math.max(1, index + 1);
+          return (
+            <View key={label} style={[styles.flowRow, styles[`flowRow_${intensity}` as const]]}>
+              <View style={styles.flowLeft}>
+                <View style={[styles.flowDot, isPast && styles.flowDotPast, isCurrent && styles.flowDotCurrent]}>
+                  <View style={styles.flowDotCore} />
+                </View>
+                {index < STAGE_LABELS.length - 1 ? <View style={styles.flowLine} /> : null}
               </View>
-            ))}
-          </View>
-        </View>
-      </View>
-          <View style={styles.heroBirdWrap} pointerEvents="none">
-            <View style={styles.heroBirdScale}>
-              <BirdCharacter state={birdState} />
-            </View>
-          </View>
-        </ImageBackground>
-      </View>
-
-      {onCtaPress ? (
-        <View style={styles.ctaRow}>
-          <Pressable style={styles.ctaButton} onPress={onCtaPress} accessibilityRole="button">
-            <Text style={styles.ctaText}>{ctaLabel ?? '이렇게 흘러왔어요.'}</Text>
-          </Pressable>
-        </View>
-      ) : null}
-
-      <View style={styles.captionRow}>
-        <Text style={styles.captionText}>{caption ?? '처음부터 여기까지, 이렇게 흘러왔어요.'}</Text>
-        {onRewindPress ? (
-          <Pressable style={styles.rewindButton} onPress={onRewindPress} accessibilityRole="button">
-            <Text style={styles.rewindText}>이 흐름을 한 번에 보기</Text>
-          </Pressable>
-        ) : null}
-      </View>
-      {debugOpen ? (
-        <View style={styles.debugOverlay}>
-          <Pressable style={styles.debugBackdrop} onPress={() => setDebugOpen(false)} />
-          <View style={styles.debugSheet}>
-            <Text style={styles.debugTitle}>단계 선택</Text>
-            {STAGE_LABELS.map((label, index) => (
-              <Pressable
-                key={label}
-                style={[
-                  styles.debugOption,
-                  index === resolvedIndex && styles.debugOptionActive,
-                ]}
-                onPress={() => {
-                  setDebugIndex(index);
-                  setDebugOpen(false);
-                }}>
+              <View style={styles.flowContent}>
+                <View style={styles.flowTitleRow}>
+                  <Text
+                    style={[
+                      styles.flowIndex,
+                      isPast && styles.flowIndexPast,
+                      isCurrent && styles.flowIndexCurrent,
+                    ]}>
+                    {String(index + 1).padStart(2, '0')}
+                  </Text>
+                  {isCurrent ? (
+                    <View style={styles.currentBadge}>
+                      <Ionicons name="radio-button-on" size={14} color="#b32626" />
+                      <Text style={styles.currentBadgeText}>현재 단계</Text>
+                    </View>
+                  ) : null}
+                </View>
                 <Text
                   style={[
-                    styles.debugOptionText,
-                    index === resolvedIndex && styles.debugOptionTextActive,
+                    styles.flowLabel,
+                    isPast && styles.flowLabelPast,
+                    isCurrent && styles.flowLabelCurrent,
                   ]}>
                   {label}
                 </Text>
-              </Pressable>
-            ))}
-            <Pressable
-              style={styles.debugClear}
-              onPress={() => {
-                setDebugIndex(null);
-                setDebugOpen(false);
-              }}>
-              <Text style={styles.debugClearText}>자동으로 돌아가기</Text>
-            </Pressable>
-          </View>
-        </View>
-      ) : null}
+              </View>
+            </View>
+          );
+        })}
+      </View>
+
+      <View style={styles.captionRow}>
+        <Text style={styles.captionText}>{caption ?? '처음부터 여기까지, 이렇게 흘러왔어요.'}</Text>
+      </View>
     </View>
   );
 }
@@ -143,7 +102,7 @@ export default function JourneyHeader({
 const styles = StyleSheet.create({
   card: {
     borderRadius: 22,
-    backgroundColor: '#f7eeea',
+    backgroundColor: '#fbf5f2',
     padding: 16,
     gap: 14,
     shadowColor: 'rgba(93, 78, 69, 0.18)',
@@ -152,172 +111,127 @@ const styles = StyleSheet.create({
     shadowRadius: 18,
     elevation: 3,
   },
-  trackWrap: {
-    gap: 8,
-  },
-  trackOverlay: {
-    position: 'absolute',
-    top: 10,
-    left: 12,
-    right: 12,
-  },
-  labelRow: {
+  headerRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 10,
   },
-  stageLabel: {
-    fontSize: 11,
-    color: '#b1a39a',
-  },
-  stageLabelHidden: {
-    opacity: 0,
-  },
-  stageLabelCompleted: {
-    color: '#9a8b80',
-    fontWeight: '500',
-  },
-  stageLabelActive: {
-    color: '#7f7065',
-    fontWeight: '600',
-  },
-  track: {
-    position: 'relative',
-    height: 14,
+  sirenBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#ffe5e5',
+    alignItems: 'center',
     justifyContent: 'center',
   },
-  trackFill: {
-    position: 'absolute',
-    left: 0,
-    height: 4,
-    borderRadius: 3,
-    backgroundColor: 'rgba(217, 187, 170, 0.8)',
+  headerTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#5a4b42',
   },
-  checkpointRow: {
+  headerSpacer: {
+    flex: 1,
+  },
+  birdWrap: {
+    width: 54,
+    height: 54,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  birdScale: {
+    transform: [{ scale: 0.26 }],
+  },
+  verticalFlow: {
+    gap: 10,
+  },
+  flowRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    gap: 12,
   },
-  checkpoint: {
+  flowRow_1: { backgroundColor: '#fff6f3' },
+  flowRow_2: { backgroundColor: '#ffe9e3' },
+  flowRow_3: { backgroundColor: '#ffd8cf' },
+  flowRow_4: { backgroundColor: '#ffc3b6' },
+  flowRow_5: { backgroundColor: '#ffab9b' },
+  flowRow_6: { backgroundColor: '#ff8f7c' },
+  flowLeft: {
+    width: 18,
+    alignItems: 'center',
+  },
+  flowDot: {
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: 'rgba(195, 180, 170, 0.5)',
+    backgroundColor: '#f2b2a9',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  checkpointHidden: {
-    opacity: 0,
-  },
-  checkpointCore: {
+  flowDotCore: {
     width: 4,
     height: 4,
     borderRadius: 2,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    backgroundColor: '#fff',
   },
-  checkpointActive: {
-    backgroundColor: '#cfae9b',
-    transform: [{ scale: 1.05 }],
+  flowDotPast: {
+    backgroundColor: '#e07a6d',
   },
-  checkpointCompleted: {
-    backgroundColor: 'rgba(201, 174, 155, 0.75)',
+  flowDotCurrent: {
+    backgroundColor: '#c83b3b',
+    transform: [{ scale: 1.1 }],
   },
-  debugButton: {
-    position: 'absolute',
-    left: 12,
-    top: -18,
-    zIndex: 2,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+  flowLine: {
+    flex: 1,
+    width: 2,
+    marginTop: 6,
+    backgroundColor: '#e9b4ac',
   },
-  debugButtonText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#7b6c62',
+  flowContent: {
+    flex: 1,
+    gap: 2,
   },
-  debugOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 5,
+  flowTitleRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-  },
-  debugBackdrop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(50, 40, 32, 0.25)',
-  },
-  debugSheet: {
-    width: '86%',
-    borderRadius: 16,
-    backgroundColor: '#f7eeea',
-    padding: 16,
     gap: 8,
   },
-  debugTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#5f5147',
-    marginBottom: 4,
-  },
-  debugOption: {
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.7)',
-  },
-  debugOptionActive: {
-    backgroundColor: 'rgba(232, 202, 191, 0.9)',
-  },
-  debugOptionText: {
-    fontSize: 13,
-    color: '#6f5f55',
-  },
-  debugOptionTextActive: {
-    fontWeight: '600',
-    color: '#5d4e45',
-  },
-  debugClear: {
-    paddingVertical: 8,
-    alignSelf: 'flex-end',
-  },
-  debugClearText: {
-    fontSize: 12,
-    color: '#8b7a6f',
-  },
-  checkpointInactive: {
-    backgroundColor: 'rgba(195, 180, 170, 0.4)',
-  },
-  hero: {
-    height: 170,
-    borderRadius: 18,
-    backgroundColor: '#f3e7e1',
-    overflow: 'hidden',
-  },
-  heroImage: {
-    flex: 1,
-  },
-  heroImageInner: {
-    borderRadius: 18,
-    transform: [{ scale: 1.08 }, { translateY: 4 }],
-  },
-  heroBirdWrap: {
-    position: 'absolute',
-    right: 20,
-    bottom: 26,
-    width: 90,
-    height: 90,
+  currentBadge: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: '#ffe2e2',
   },
-  heroBirdScale: {
-    transform: [{ scale: 0.34 }],
+  currentBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#8d1f1f',
+  },
+  flowIndex: {
+    fontSize: 11,
+    color: '#8b6a63',
+    fontWeight: '700',
+  },
+  flowIndexPast: {
+    color: '#7a5550',
+  },
+  flowIndexCurrent: {
+    color: '#8d1f1f',
+  },
+  flowLabel: {
+    fontSize: 13,
+    color: '#5f4b44',
+    fontWeight: '600',
+  },
+  flowLabelPast: {
+    color: '#5c463f',
+  },
+  flowLabelCurrent: {
+    color: '#8d1f1f',
   },
   captionRow: {
     gap: 6,

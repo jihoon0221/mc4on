@@ -57,6 +57,7 @@ type AnalysisJobStatus = {
 type ReportHistoryItem = {
   analysis_date: string;
   summary_text: string | null;
+  long_summary?: string | null;
   tags: string[];
   warning_text: string | null;
   warning_tags: string[];
@@ -114,6 +115,7 @@ function normalizeAnalysisResult(input: KakaoUploadResponse['analysis_result']):
   return {
     analysis_date: input.analysis_date,
     summary_text: input.summary_text ?? null,
+    long_summary: input.long_summary ?? null,
     tags: input.tags ?? [],
     warning_text: input.warning_text ?? null,
     warning_tags: input.warning_tags ?? [],
@@ -157,6 +159,7 @@ function normalizeHistoryItem(item: ReportHistoryItem): AnalysisResult {
   return {
     analysis_date: item.analysis_date,
     summary_text: item.summary_text ?? null,
+    long_summary: item.long_summary ?? null,
     tags: item.tags ?? [],
     warning_text: item.warning_text ?? null,
     warning_tags: item.warning_tags ?? [],
@@ -506,6 +509,7 @@ export default function HomeScreen() {
                 {
                   analysis_date: nextBundle.date,
                   summary_text: nextBundle.summary.summary_text,
+                  long_summary: nextBundle.summary.long_summary ?? null,
                   tags: nextBundle.summary.tags,
                   warning_text: nextBundle.summary.warning_text ?? null,
                   warning_tags: nextBundle.summary.warning_tags ?? [],
