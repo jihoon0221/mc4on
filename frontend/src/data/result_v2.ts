@@ -32,7 +32,7 @@ export type V2Result = {
 
 function birdStateFromRiskLevel(level?: number | null): BirdState {
   const value = level ?? 0;
-  if (value >= 4) return 'anxious';
+  if (value >= 4) return 'critical';
   if (value >= 3) return 'anxious';
   if (value >= 2) return 'cautious';
   return 'calm';

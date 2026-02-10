@@ -17,7 +17,10 @@ type TimelineCompleteResponse = {
 };
 
 function mapBirdStateFromRisk(birdState: number): BirdState {
-  return birdState > 0 ? 'anxious' : 'calm';
+  if (birdState >= 4) return 'critical';
+  if (birdState >= 3) return 'anxious';
+  if (birdState >= 2) return 'cautious';
+  return 'calm';
 }
 
 export async function fetchTimelineEntries(): Promise<TimelineEntry[]> {

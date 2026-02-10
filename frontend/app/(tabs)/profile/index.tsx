@@ -76,6 +76,9 @@ export default function ProfileScreen() {
             </View>
             <View style={styles.headerText}>
               <Text style={styles.nameText}>{profile?.name || '이름 —'}</Text>
+              <Pressable style={styles.editButton} onPress={() => router.push('/(tabs)/profile/edit')}>
+                <Text style={styles.editButtonText}>상대정보 수정</Text>
+              </Pressable>
               <View style={styles.pillRow}>
                 <View style={styles.pill}>
                   <Text style={styles.pillLabel}>나이</Text>
@@ -255,6 +258,20 @@ const styles = StyleSheet.create({
   headerText: {
     flex: 1,
     gap: 8,
+  },
+  editButton: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    borderWidth: 1,
+    borderColor: '#eaded6',
+  },
+  editButtonText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#6b5b52',
   },
   nameText: {
     fontSize: 20,

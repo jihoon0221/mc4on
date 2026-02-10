@@ -63,6 +63,7 @@ export default function QuizScreen() {
   const quizzes = bundle?.quizzes ?? [];
   const summary = bundle?.summary;
   const highRisk = (summary?.risk_level ?? 0) >= 4;
+  const shouldShowReport = highRisk && !hideSummary;
 
   const [stepIndex, setStepIndex] = useState(0);
   const [selected, setSelected] = useState<number | null>(null);
@@ -86,13 +87,12 @@ export default function QuizScreen() {
   useEffect(() => {
     if (!hideSummary) return;
     if (stepIndex !== 3) return;
-    if (highRisk) return;
     if (typeof router.canGoBack === 'function' ? router.canGoBack() : false) {
       router.back();
     } else {
       router.replace('/(tabs)');
     }
-  }, [hideSummary, stepIndex, highRisk, router]);
+  }, [hideSummary, stepIndex, router]);
 
   useEffect(() => {
     if (stepIndex === 3) {
@@ -159,17 +159,17 @@ export default function QuizScreen() {
   }, [isOrderQuiz, orderCorrect, stepIndex]);
 
   useEffect(() => {
-    if (!highRisk) {
+    if (!shouldShowReport) {
       reportOpenedRef.current = false;
       return;
     }
     if (reportOpenedRef.current) return;
     reportOpenedRef.current = true;
-    router.push('/(modals)/report');
-  }, [highRisk, router]);
+    router.replace('/(modals)/report');
+  }, [shouldShowReport, router]);
 
-  if (highRisk) {
-    return <SafeAreaView style={styles.safeArea} />;
+  if (shouldShowReport) {
+    return null;
   }
 
   const canProceed =

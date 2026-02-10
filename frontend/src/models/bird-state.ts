@@ -1,1 +1,1 @@
-export type BirdState = 'calm' | 'cautious' | 'anxious' | 'relieved' | 'growing';
+export type BirdState = 'calm' | 'cautious' | 'anxious' | 'critical' | 'relieved' | 'growing';

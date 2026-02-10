@@ -33,6 +33,7 @@ function mapBirdState(state?: ModelBirdState): VisualBirdState {
   if (state === 'calm') return 'healthy';
   if (state === 'cautious') return 'uneasy';
   if (state === 'anxious') return 'distorted';
+  if (state === 'critical') return 'critical';
   if (state === 'relieved') return 'healthy';
   if (state === 'growing') return 'healthy';
   return 'healthy';
@@ -53,7 +54,7 @@ function birdFromSeverity(value: number): VisualBirdState {
 }
 
 const WARNING_MESSAGE = '이 기록은 잠시 멈춰 다시 살펴볼 만한 부분이 있어요.';
-const FLOW_MESSAGE = '최근 흐름을 요약해서 보여줘요.';
+const FLOW_MESSAGE = '실제 피해 흐름은 이렇게 돼요.';
 
 function stageFromDayIndex(dayIndex: number) {
   if (dayIndex <= 1) return 0;

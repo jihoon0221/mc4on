@@ -1,8 +1,30 @@
 import { router } from 'expo-router';
 import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 export default function ReportModal() {
+  const handleDownloadEvidence = async () => {
+    const dir = `${FileSystem.documentDirectory}evidence/`;
+    const fileUri = `${dir}evidence_pack.zip`;
+    await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
+    // Minimal empty zip (end of central directory only)
+    const emptyZipBase64 = 'UEsFBgAAAAAAAAAAAAAAAAAAAAAAAA==';
+    await FileSystem.writeAsStringAsync(fileUri, emptyZipBase64, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+    const canShare = await Sharing.isAvailableAsync();
+    if (canShare) {
+      await Sharing.shareAsync(fileUri, {
+        mimeType: 'application/zip',
+        dialogTitle: '증거 집 파일',
+        UTI: 'public.zip-archive',
+      });
+      return;
+    }
+    await Linking.openURL(fileUri);
+  };
   return (
     <View style={styles.backdrop}>
       <View style={styles.card}>
@@ -80,6 +102,14 @@ export default function ReportModal() {
               Q. 신고하면 상대에게 제가 신고한 게 알려지나요?{'\n'}
               → 일반적으로 신고자가 보호되며 상대에게 자동 통보되지 않습니다.
             </Text>
+            <Pressable
+              style={styles.linkButton}
+              onPress={() => Linking.openURL('https://ecrm.police.go.kr/minwon/main')}>
+              <Text style={styles.linkButtonText}>사이버범죄 신고 시스템으로 이동하기</Text>
+            </Pressable>
+            <Pressable style={styles.downloadButton} onPress={() => void handleDownloadEvidence()}>
+              <Text style={styles.downloadButtonText}>증거 집 파일 다운받기</Text>
+            </Pressable>
           </View>
         </ScrollView>
       </View>
@@ -148,5 +178,31 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 20,
     color: '#5a4b42',
+  },
+  linkButton: {
+    marginTop: 10,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: '#ffe3e3',
+  },
+  linkButtonText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#b32626',
+  },
+  downloadButton: {
+    marginTop: 8,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: '#f2e6df',
+  },
+  downloadButtonText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#6b5b52',
   },
 });

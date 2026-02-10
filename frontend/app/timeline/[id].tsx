@@ -9,6 +9,8 @@ import SimilarChatCard from '@/src/components/SimilarChatCard';
 import { getV2DayIndex } from '@/src/utils/v2-day-index';
 import { getV1DayIndex } from '@/src/utils/v1-day-index';
 import RelationshipFlowHeader from '@/src/components/RelationshipFlowHeader';
+import type { BirdState as ModelBirdState } from '@/src/models/bird-state';
+import type { BirdState as VisualBirdState } from '@/src/components/BirdCharacter';
 
 const FLAG_ROWS = [
   { key: 'moneyRequest', label: '금전 요청' },
@@ -30,6 +32,17 @@ function buildTags(flags: Record<string, boolean>) {
   if (flags.linkIncluded) tags.push('#링크');
   if (flags.imageIncluded) tags.push('#이미지');
   return tags.length > 0 ? tags : ['#일상'];
+}
+
+function mapBirdState(state?: ModelBirdState): VisualBirdState {
+  if (!state) return 'healthy';
+  if (state === 'calm') return 'healthy';
+  if (state === 'cautious') return 'uneasy';
+  if (state === 'anxious') return 'distorted';
+  if (state === 'critical') return 'critical';
+  if (state === 'relieved') return 'healthy';
+  if (state === 'growing') return 'healthy';
+  return 'healthy';
 }
 
 export default function TimelineDetailScreen() {
@@ -69,7 +82,8 @@ export default function TimelineDetailScreen() {
   const riskLevel = entry?.riskLevel ?? record?.analysisResult?.risk_level ?? null;
   const showLongSummary = Boolean(longSummary) && !((riskLevel ?? 0) >= 4);
   const dayIndex = getV2DayIndex((entry?.date ?? record?.date) ?? null);
-  const showSimilar = (dayIndex ?? 0) >= 6;
+  const showSimilar = entry?.version === 2 && dayIndex !== null && dayIndex >= 6;
+  const visualBirdState = useMemo(() => mapBirdState(entry?.birdState ?? record?.birdState), [entry, record]);
 
   const relationshipLabels = useMemo(() => {
     const date = entry?.date ?? record?.date ?? null;
@@ -167,6 +181,7 @@ export default function TimelineDetailScreen() {
         <RelationshipFlowHeader
           labels={relationshipLabels}
           activeIndex={relationshipStageIndex}
+          birdState={visualBirdState}
         />
 
         {shouldShowSection ? (
@@ -215,11 +230,7 @@ export default function TimelineDetailScreen() {
         ) : null}
       </ScrollView>
 
-      <View style={styles.footer}>
-        <Pressable style={styles.ctaButton} onPress={() => router.push('/(tabs)/profile')}>
-          <Text style={styles.ctaText}>프로필로 이동</Text>
-        </Pressable>
-      </View>
+      <View style={styles.footer} />
 
       {showOverlay ? (
         <View style={styles.overlay}>

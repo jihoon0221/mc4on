@@ -19,7 +19,8 @@ import { API_BASE_URL, apiFetch } from '@/src/api/client';
 import { uploadKakao, type KakaoUploadResponse } from '@/src/api/upload';
 import v1Result from '@/src/data/result_v1';
 import { buildV2AnalysisResult, buildV2TimelineEntry, pickNextV2Bundle } from '@/src/data/result_v2';
-import { getQuizVersion } from '@/src/storage/debug-settings';
+import { QUIZ_V2 } from '@/src/data/quiz_v2';
+import { getDebugV2Day, getQuizVersion } from '@/src/storage/debug-settings';
 import type { TimelineEntry } from '@/src/models/timeline-entry';
 import { saveTimelineEntries } from '@/src/storage/timeline-storage';
 import { fetchTimelineEntries } from '@/src/api/timeline';
@@ -32,6 +33,8 @@ import { useTimeline } from '@/src/context/timeline-context';
 import type { AnalysisResult } from '@/src/models/analysis-result';
 import type { BirdState as ModelBirdState } from '@/src/models/bird-state';
 import { getSeoulDateKey } from '@/src/utils/date';
+import { getV1DayIndex } from '@/src/utils/v1-day-index';
+import { getV2DayIndex } from '@/src/utils/v2-day-index';
 import { parseKakaoFile, type ParsedConversation } from '@/src/utils/kakaoImport';
 
 const FEEDING_MS = 900;
@@ -81,17 +84,18 @@ function mapBirdStateToVisual(state?: ModelBirdState): BirdState | null {
   if (state === 'calm') return 'healthy';
   if (state === 'cautious') return 'uneasy';
   if (state === 'anxious') return 'distorted';
+  if (state === 'critical') return 'critical';
   if (state === 'relieved') return 'healthy';
   if (state === 'growing') return 'healthy';
   return null;
 }
 
-function birdStateFromRiskLevel(level?: number | null): BirdState {
+function birdStateFromRiskLevel(level?: number | null): ModelBirdState {
   const value = level ?? 0;
   if (value >= 4) return 'critical';
-  if (value >= 3) return 'distorted';
-  if (value >= 2) return 'uneasy';
-  return 'healthy';
+  if (value >= 3) return 'anxious';
+  if (value >= 2) return 'cautious';
+  return 'calm';
 }
 
 function logUpload(label: string, data: Record<string, unknown>) {
@@ -180,7 +184,6 @@ export default function HomeScreen() {
   const [isImporting, setIsImporting] = useState(false);
   const [hasTodayEgg, setHasTodayEgg] = useState(false);
   const [eggJustLaid, setEggJustLaid] = useState(false);
-  const [showReasons, setShowReasons] = useState(false);
   const [eggCracking, setEggCracking] = useState(false);
   const [showEggOverlay, setShowEggOverlay] = useState(false);
   const [cycleIndex, setCycleIndex] = useState(0);
@@ -223,15 +226,23 @@ export default function HomeScreen() {
   const cycleStates: BirdState[] = ['healthy', 'uneasy', 'distorted', 'critical'];
 
   const birdState = useMemo(() => getBirdState(uploadCount), [uploadCount]);
-  const canShowReasonButton = birdState !== 'healthy';
+  const canShowReasonButton = visualState === 'distorted' || visualState === 'critical';
   const todayKey = useMemo(() => getSeoulDateKey(), []);
   const todayRecord = useMemo(
     () => records.find((record) => record.date === todayKey),
     [records, todayKey]
   );
   const learnedToday = todayRecord?.learned ?? false;
-  const mappedState = mapBirdStateToVisual(todayRecord?.birdState);
-  const visualState = learnedToday ? cycleStates[cycleIndex] : 'healthy';
+  const latestRecord = useMemo(() => {
+    if (!records.length) return null;
+    return [...records].sort((a, b) => b.date.localeCompare(a.date))[0] ?? null;
+  }, [records]);
+  const mappedState = mapBirdStateToVisual((latestRecord ?? todayRecord)?.birdState);
+  const visualState = mappedState ?? (learnedToday ? cycleStates[cycleIndex] : birdState);
+  const heroDate = latestRecord?.date ?? getSeoulDateKey();
+  const heroDayIndex = getV2DayIndex(heroDate) ?? getV1DayIndex(heroDate);
+  const heroDayLabel = heroDayIndex ? `Day ${heroDayIndex}` : 'Day —';
+  const heroDateLabel = heroDate.replace(/-/g, '.');
   const eggAvailable = eggReady || hasTodayEgg;
 
   useEffect(() => {
@@ -491,38 +502,46 @@ export default function HomeScreen() {
           response = v1Result as KakaoUploadResponse;
           forceReplace = true;
         } else if (version === 2) {
-          const nextBundle = pickNextV2Bundle(records.map((record) => record.date));
-          if (nextBundle) {
-            const nextAnalysis = buildV2AnalysisResult(nextBundle);
+          const debugDay = await getDebugV2Day();
+          const targetDate = debugDay ?? pickNextV2Bundle(records.map((record) => record.date))?.date ?? null;
+          if (targetDate) {
+            const targetIndex = QUIZ_V2.findIndex((bundle) => bundle.date === targetDate);
+            const bundles = targetIndex >= 0 ? QUIZ_V2.slice(0, targetIndex + 1) : [];
+            const nextBundle = bundles[bundles.length - 1];
+            if (!nextBundle) {
+              response = null;
+              // fall through to error handling below
+            } else {
+              const nextAnalysis = buildV2AnalysisResult(nextBundle);
             response = {
               analysis_result: nextAnalysis,
-              timeline: [
-                {
-                  analysis_date: nextBundle.date,
-                  summary_short: nextBundle.summary.summary_text,
-                  tags: nextBundle.summary.tags,
-                  warning_text: nextBundle.summary.warning_text ?? null,
-                  warning_tags: nextBundle.summary.warning_tags ?? [],
-                  risk_level: nextBundle.summary.risk_level ?? null,
-                  bird_state: nextBundle.summary.risk_level ?? 0,
-                },
-              ],
-              dailyreport: [
-                {
-                  analysis_date: nextBundle.date,
-                  summary_text: nextBundle.summary.summary_text,
-                  long_summary: nextBundle.summary.long_summary ?? null,
-                  tags: nextBundle.summary.tags,
-                  warning_text: nextBundle.summary.warning_text ?? null,
-                  warning_tags: nextBundle.summary.warning_tags ?? [],
-                  risk_level: nextBundle.summary.risk_level ?? null,
-                  learning_items: nextAnalysis.learning_items.map((item) => ({
+              timeline: bundles.map((bundle) => ({
+                analysis_date: bundle.date,
+                summary_short: bundle.summary.summary_text,
+                tags: bundle.summary.tags,
+                warning_text: bundle.summary.warning_text ?? null,
+                warning_tags: bundle.summary.warning_tags ?? [],
+                risk_level: bundle.summary.risk_level ?? null,
+                bird_state: bundle.summary.risk_level ?? 0,
+              })),
+              dailyreport: bundles.map((bundle) => {
+                const analysis = buildV2AnalysisResult(bundle);
+                return {
+                  analysis_date: bundle.date,
+                  summary_text: bundle.summary.summary_text,
+                  long_summary: bundle.summary.long_summary ?? null,
+                  tags: bundle.summary.tags,
+                  warning_text: bundle.summary.warning_text ?? null,
+                  warning_tags: bundle.summary.warning_tags ?? [],
+                  risk_level: bundle.summary.risk_level ?? null,
+                  learning_items: analysis.learning_items.map((item) => ({
                     content_kr: item.content_kr,
                     content_fl: item.content_fl,
                   })),
-                },
-              ],
+                };
+              }),
             } as KakaoUploadResponse;
+            }
           }
         } else {
           response = await uploadKakao({
@@ -574,11 +593,8 @@ export default function HomeScreen() {
             dates: mapped.map((item) => item.date),
           });
           if (version === 2) {
-            const nextEntry = mapped[0];
-            if (nextEntry) {
-              logTimeline('add_entry', { id: nextEntry.id, date: nextEntry.date });
-              await addEntry(nextEntry);
-            }
+            logTimeline('replace_entries', { count: mapped.length });
+            await replaceEntries(mapped);
           } else {
             logTimeline('save_entries', { count: mapped.length });
             await replaceEntries(mapped);
@@ -609,6 +625,7 @@ export default function HomeScreen() {
               flags: parsed.flags,
               uploadCount: 1,
               learned: false,
+              birdState: birdStateFromRiskLevel(normalized?.risk_level ?? null),
               immediateRisk: {
                 scamUrl: false,
                 reportedAccount: false,
@@ -622,39 +639,37 @@ export default function HomeScreen() {
           });
 
           if (version === 2) {
-            const nextRecord = normalizedItems[0];
-            if (nextRecord) {
-              const updated = [nextRecord, ...records.filter((record) => record.date !== nextRecord.date)];
-              await replaceAll(updated);
-              replacedAll = true;
-            }
+            const sorted = [...normalizedItems].sort((a, b) => b.date.localeCompare(a.date));
+            await replaceAll(sorted);
+            replacedAll = true;
           } else {
             await replaceAll(normalizedItems);
             replacedAll = true;
           }
         }
-        if (forceReplace && !replacedAll) {
-          const now = new Date().toISOString();
-          const fallback = normalizeAnalysisResult(fallbackResult as KakaoUploadResponse['analysis_result']);
-          if (fallback) {
-            await replaceAll([
-              {
-                id: `day_${fallback.analysis_date}`,
-                date: fallback.analysis_date,
-                source: 'kakaotalk_txt',
-                sourceFileName: file.name,
-                extractedSentences: fallback.learning_items.map((learn) => learn.content_kr).filter(Boolean).slice(0, 3),
-                nativeSentences: fallback.learning_items.map((learn) => learn.content_fl).filter(Boolean),
-                flags: parsed.flags,
-                uploadCount: 1,
-                learned: false,
-                immediateRisk: {
-                  scamUrl: false,
-                  reportedAccount: false,
-                  aiImage: false,
-                },
-                immediateRiskShown: false,
-                analysisResult: fallback,
+          if (forceReplace && !replacedAll) {
+            const now = new Date().toISOString();
+            const fallback = normalizeAnalysisResult(fallbackResult as KakaoUploadResponse['analysis_result']);
+            if (fallback) {
+              await replaceAll([
+                {
+                  id: `day_${fallback.analysis_date}`,
+                  date: fallback.analysis_date,
+                  source: 'kakaotalk_txt',
+                  sourceFileName: file.name,
+                  extractedSentences: fallback.learning_items.map((learn) => learn.content_kr).filter(Boolean).slice(0, 3),
+                  nativeSentences: fallback.learning_items.map((learn) => learn.content_fl).filter(Boolean),
+                  flags: parsed.flags,
+                  uploadCount: 1,
+                  learned: false,
+                  birdState: birdStateFromRiskLevel(fallback.risk_level ?? null),
+                  immediateRisk: {
+                    scamUrl: false,
+                    reportedAccount: false,
+                    aiImage: false,
+                  },
+                  immediateRiskShown: false,
+                  analysisResult: fallback,
                 createdAt: now,
                 updatedAt: now,
               },
@@ -737,7 +752,7 @@ export default function HomeScreen() {
           setEggReady(false);
           feedScale.setValue(1);
           feedOpacity.setValue(1);
-          setImportMessage('오늘의 먹이가 준비됐어요. 새에게 먹여볼까요?');
+          setImportMessage('');
         }
       } else {
         setFeedReady(true);
@@ -746,7 +761,7 @@ export default function HomeScreen() {
         setEggReady(false);
         feedScale.setValue(1);
         feedOpacity.setValue(1);
-        setImportMessage('오늘의 먹이가 준비됐어요. 새에게 먹여볼까요?');
+        setImportMessage('');
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : '';
@@ -787,6 +802,12 @@ export default function HomeScreen() {
             pointerEvents="box-none"
             onPress={eggAvailable ? openNotepad : undefined}
             accessibilityRole="button">
+            <View style={styles.frameWrap} pointerEvents="none">
+              <View style={styles.frameCard}>
+                <Text style={styles.frameDate}>{heroDateLabel}</Text>
+                <Text style={styles.frameDay}>{heroDayLabel}</Text>
+              </View>
+            </View>
             <View style={[styles.sceneWrap, eggJustLaid && styles.sceneWrapPulse]}>
               <View style={styles.nestWrap}>
                 <Nest
@@ -844,20 +865,15 @@ export default function HomeScreen() {
               </Text>
             </View>
 
-            {canShowReasonButton && learnedToday ? (
-              <Pressable
-                style={styles.reasonButton}
-                onPress={() => setShowReasons((prev) => !prev)}
-                accessibilityRole="button">
-                <Text style={styles.reasonButtonText}>조용히 이유를 살펴볼까요?</Text>
-              </Pressable>
-            ) : null}
-
-            {showReasons && learnedToday ? (
+            {canShowReasonButton ? (
               <View style={styles.reasonWrap}>
-                <Text style={styles.reasonText}>
-                  최근 대화에 반복된 금전 관련 표현, 도움 요청, 외부 링크가 보였어요.
-                </Text>
+                <Text style={styles.reasonText}>색이 왜 변했는지 알아볼까요?</Text>
+                <Pressable
+                  style={styles.reasonButton}
+                  onPress={() => router.push('/(tabs)/timeline')}
+                  accessibilityRole="button">
+                  <Text style={styles.reasonButtonText}>타임라인으로 이동하기</Text>
+                </Pressable>
               </View>
             ) : null}
           </View>
@@ -948,6 +964,38 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(241, 220, 229, 0.45)',
     borderRadius: 26,
     overflow: 'hidden',
+  },
+  frameWrap: {
+    position: 'absolute',
+    top: 12,
+    left: 16,
+    right: 16,
+    alignItems: 'center',
+    zIndex: 8,
+  },
+  frameCard: {
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 14,
+    backgroundColor: '#f8eee9',
+    borderWidth: 1,
+    borderColor: '#e7d6cd',
+    shadowColor: 'rgba(120, 96, 86, 0.22)',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 4,
+    alignItems: 'center',
+  },
+  frameDate: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#6b5b52',
+  },
+  frameDay: {
+    marginTop: 2,
+    fontSize: 12,
+    color: '#8a7b6f',
   },
   sceneWrap: {
     width: '100%',
@@ -1060,17 +1108,21 @@ const styles = StyleSheet.create({
     color: '#907f73',
   },
   reasonButton: {
-    alignSelf: 'flex-start',
-    paddingVertical: 4,
-    opacity: 0.78,
+    alignSelf: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    backgroundColor: 'rgba(215, 191, 176, 0.55)',
   },
   reasonButtonText: {
     fontSize: 11,
-    color: '#9a8a7d',
+    fontWeight: '600',
+    color: '#6d5f55',
   },
   reasonWrap: {
-    paddingTop: 2,
-    paddingRight: 6,
+    marginTop: 6,
+    alignItems: 'center',
+    gap: 6,
   },
   reasonText: {
     fontSize: 12,

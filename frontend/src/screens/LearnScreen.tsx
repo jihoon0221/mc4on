@@ -11,6 +11,7 @@ import { useDayRecords } from '@/src/context/day-records-context';
 import { useTimeline } from '@/src/context/timeline-context';
 import SimilarChatCard from '@/src/components/SimilarChatCard';
 import { getV2DayIndex } from '@/src/utils/v2-day-index';
+import { getQuizVersion } from '@/src/storage/debug-settings';
 import type { AnalysisResult, LearningItem } from '@/src/models/analysis-result';
 import type { BirdState } from '@/src/models/bird-state';
 import type { DayRecord } from '@/src/models/day-record';
@@ -122,6 +123,7 @@ export default function LearnScreen({
   const [debugMonth, setDebugMonth] = useState('');
   const [debugLoading, setDebugLoading] = useState(false);
   const [dayIndex, setDayIndex] = useState<number | null>(null);
+  const [quizVersion, setQuizVersion] = useState(1);
 
   const demoSentences = [
     '오늘은 조금 천천히 이야기하고 싶어.',
@@ -176,7 +178,7 @@ export default function LearnScreen({
   const useDemo = learningItems.length === 0 && (!todayRecord || (todayRecord.nativeSentences?.length ?? 0) === 0);
   const hasWarning = Boolean(activeAnalysis?.warning_text && activeAnalysis.warning_text.trim().length > 0);
   const v2DayIndex = getV2DayIndex(activeAnalysis?.analysis_date ?? todayRecord?.date ?? null);
-  const showSimilar = (v2DayIndex ?? 0) >= 6;
+  const showSimilar = quizVersion === 2 && v2DayIndex !== null && v2DayIndex >= 6;
   const sentences = useDemo
     ? demoSentences
     : learningItems.length > 0
@@ -209,6 +211,17 @@ export default function LearnScreen({
     if (!analysis?.analysis_date) return;
     setDebugDate((prev) => (prev ? prev : analysis.analysis_date));
   }, [analysis?.analysis_date]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const version = await getQuizVersion(1);
+      if (!cancelled) setQuizVersion(version);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!showDebug || !debugOpen) return;

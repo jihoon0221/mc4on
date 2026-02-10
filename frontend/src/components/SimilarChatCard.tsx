@@ -19,9 +19,8 @@ export default function SimilarChatCard({ compact }: SimilarChatCardProps) {
         </View>
         <View style={styles.bubble}>
           <Text style={styles.bubbleText}>
-            그 물건을 한국으로 보내려는데 잠깐 보관해줄 수 있을까?{'\n'}
-            통관 절차 때문에 비용이 조금 필요하대.{'\n'}
-            처리만 되면 바로 돌려줄게.
+            더 말하면… 포상금 일부가 금 형태로 보관돼 있어요.{'\n'}
+            그걸 한국으로 보내서 당신이 잠시 보관해주면 좋겠다고 했어요.
           </Text>
         </View>
       </View>
