@@ -5,7 +5,6 @@ import { Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 
 import { useDayRecords } from '@/src/context/day-records-context';
 import { useTimeline } from '@/src/context/timeline-context';
-import { buildV2AnalysisResult, buildV2TimelineEntry } from '@/src/data/result_v2';
 import { QUIZ_V2 } from '@/src/data/quiz_v2';
 import { getDebugV2Day, getQuizVersion, markDebugReset, setDebugV2Day, setQuizVersion } from '@/src/storage/debug-settings';
 import { RECORDS_KEY } from '@/src/storage/day-record-storage';
@@ -58,43 +57,9 @@ export default function DebugSettingsModal() {
     const bundle = QUIZ_V2[dayIndex];
     if (!bundle) return;
     const date = bundle.date;
-    const now = new Date().toISOString();
-    const slice = QUIZ_V2.slice(0, dayIndex + 1);
-    const nextRecords = slice.map((item) => {
-      const analysis = buildV2AnalysisResult(item);
-      return {
-        id: `day_${item.date}`,
-        date: item.date,
-        source: 'kakaotalk_txt' as const,
-        sourceFileName: `debug_v2_${item.date}.zip`,
-        extractedSentences: analysis.learning_items.map((learn) => learn.content_kr).filter(Boolean).slice(0, 3),
-        nativeSentences: analysis.learning_items.map((learn) => learn.content_fl).filter(Boolean),
-        flags: {
-          moneyRequest: false,
-          favorRequest: false,
-          excessivePraise: false,
-          linkIncluded: false,
-          imageIncluded: false,
-        },
-        uploadCount: 1,
-        learned: false,
-        immediateRisk: {
-          scamUrl: false,
-          reportedAccount: false,
-          aiImage: false,
-        },
-        immediateRiskShown: false,
-        analysisResult: analysis,
-        createdAt: now,
-        updatedAt: now,
-      };
-    });
-    const nextTimeline = slice.map((item) => buildV2TimelineEntry(item));
     await setDebugV2Day(date);
-    await replaceRecords(nextRecords);
-    await replaceEntries(nextTimeline);
     setSelectedDay(date);
-    setMessage(`V2 Day ${dayIndex + 1} (${date})로 설정했어요.`);
+    setMessage(`V2 Day ${dayIndex + 1} (${date})로 설정했어요. 업로드하면 적용돼요.`);
   };
 
   return (

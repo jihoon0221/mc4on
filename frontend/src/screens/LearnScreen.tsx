@@ -177,6 +177,7 @@ export default function LearnScreen({
   const learningItems: LearningItem[] = activeAnalysis?.learning_items ?? [];
   const useDemo = learningItems.length === 0 && (!todayRecord || (todayRecord.nativeSentences?.length ?? 0) === 0);
   const hasWarning = Boolean(activeAnalysis?.warning_text && activeAnalysis.warning_text.trim().length > 0);
+  const analysisDate = activeAnalysis?.analysis_date ?? null;
   const v2DayIndex = getV2DayIndex(activeAnalysis?.analysis_date ?? todayRecord?.date ?? null);
   const showSimilar = quizVersion === 2 && v2DayIndex !== null && v2DayIndex >= 6;
   const sentences = useDemo
@@ -391,8 +392,8 @@ export default function LearnScreen({
             ) : null}
           </View>
           <Text style={styles.subtitle}>
-            {activeAnalysis?.analysis_date
-              ? formatDateLabel(activeAnalysis.analysis_date)
+            {analysisDate
+              ? formatDateLabel(analysisDate)
               : useDemo
                 ? '오늘'
                 : formatDateLabel(todayKey)}

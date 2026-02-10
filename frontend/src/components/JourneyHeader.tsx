@@ -13,6 +13,15 @@ const STAGE_LABELS = [
   '압박·잠적',
 ] as const;
 
+const FLOW_ROW_STYLES = [
+  'flowRow_1',
+  'flowRow_2',
+  'flowRow_3',
+  'flowRow_4',
+  'flowRow_5',
+  'flowRow_6',
+] as const;
+
 type JourneyHeaderProps = {
   activeIndex: number;
   caption?: string;
@@ -52,9 +61,10 @@ export default function JourneyHeader({
         {STAGE_LABELS.map((label, index) => {
           const isPast = index < resolvedIndex;
           const isCurrent = index === resolvedIndex;
-          const intensity = Math.max(1, index + 1);
+          const styleIndex = Math.min(index, FLOW_ROW_STYLES.length - 1);
+          const flowRowStyle = styles[FLOW_ROW_STYLES[styleIndex]];
           return (
-            <View key={label} style={[styles.flowRow, styles[`flowRow_${intensity}` as const]]}>
+            <View key={label} style={[styles.flowRow, flowRowStyle]}>
               <View style={styles.flowLeft}>
                 <View style={[styles.flowDot, isPast && styles.flowDotPast, isCurrent && styles.flowDotCurrent]}>
                   <View style={styles.flowDotCore} />

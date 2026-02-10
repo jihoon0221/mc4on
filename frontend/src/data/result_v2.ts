@@ -53,31 +53,6 @@ function buildLearningItems(bundle: QuizBundle) {
   });
 }
 
-export function buildV2Result(): V2Result {
-  const timeline = QUIZ_V2.map((bundle) => ({
-    analysis_date: bundle.date,
-    summary_short: bundle.summary.summary_text,
-    tags: bundle.summary.tags,
-    warning_text: bundle.summary.warning_text ?? null,
-    warning_tags: bundle.summary.warning_tags ?? [],
-    risk_level: bundle.summary.risk_level ?? null,
-    bird_state: bundle.summary.risk_level ?? 0,
-  }));
-
-  const dailyreport = QUIZ_V2.map((bundle) => ({
-    analysis_date: bundle.date,
-    summary_text: bundle.summary.summary_text,
-    long_summary: bundle.summary.long_summary ?? null,
-    tags: bundle.summary.tags,
-    warning_text: bundle.summary.warning_text ?? null,
-    warning_tags: bundle.summary.warning_tags ?? [],
-    risk_level: bundle.summary.risk_level ?? null,
-    learning_items: buildLearningItems(bundle),
-  }));
-
-  return { timeline, dailyreport };
-}
-
 export function pickNextV2Bundle(existingDates: string[]): QuizBundle | null {
   if (QUIZ_V2.length === 0) return null;
   for (let i = 0; i < QUIZ_V2.length; i += 1) {
@@ -129,6 +104,4 @@ export function buildV2TimelineEntry(bundle: QuizBundle): TimelineEntry {
   };
 }
 
-const resultV2 = buildV2Result();
-
-export default resultV2;
+// No default export: V2 results are composed in HomeScreen for upload simulation.
