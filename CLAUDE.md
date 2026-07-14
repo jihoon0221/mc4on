@@ -1,4 +1,4 @@
-# 프로젝트 작업 컨벤션 (BirdGuard / mc4on)
+# 프로젝트 작업 컨벤션 (on / 구 BirdGuard, mc4on)
 
 팀 프로젝트 (Yeaeun, jh 등 공동 작업). 브랜치 정리 시 팀원과 먼저 상의할 것.
 

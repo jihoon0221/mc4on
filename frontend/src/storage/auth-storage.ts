@@ -11,8 +11,8 @@ export type AuthCredentials = {
   password: string;
 };
 
-const USER_KEY = 'birdguard.auth.user';
-const CRED_KEY = 'birdguard.auth.cred';
+const USER_KEY = 'on.auth.user';
+const CRED_KEY = 'on.auth.cred';
 
 export async function loadAuthUser(): Promise<AuthUser | null> {
   const raw = await AsyncStorage.getItem(USER_KEY);

@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import type { Profile } from '@/src/models/profile';
 
-const PROFILE_KEY = 'birdguard.profile.v1';
+const PROFILE_KEY = 'on.profile.v1';
 
 export async function loadProfile(): Promise<Profile | null> {
   try {

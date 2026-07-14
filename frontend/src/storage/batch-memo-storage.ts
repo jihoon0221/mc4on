@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const BATCH_MEMO_KEY = 'birdguard.batch_memo_dates.v1';
+const BATCH_MEMO_KEY = 'on.batch_memo_dates.v1';
 
 export async function savePendingBatchDates(dates: string[]): Promise<void> {
   await AsyncStorage.setItem(BATCH_MEMO_KEY, JSON.stringify(dates));

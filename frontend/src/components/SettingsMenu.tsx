@@ -12,8 +12,8 @@ type SettingsMenuProps = {
 };
 
 const PANEL_WIDTH = 360;
-const VIBRATION_KEY = 'birdguard.settings.vibration';
-const NOTIFICATION_KEY = 'birdguard.settings.notification';
+const VIBRATION_KEY = 'on.settings.vibration';
+const NOTIFICATION_KEY = 'on.settings.notification';
 
 export default function SettingsMenu({ visible, onClose }: SettingsMenuProps) {
   const router = useRouter();
